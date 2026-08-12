@@ -1,0 +1,125 @@
+/** المستخدمون والأدوار + سجل العمليات (Audit) — بيانات حقيقية عبر tRPC */
+import { useMemo, useState } from "react";
+import { DataTable, DocShell, ErpInput, ErpSelect, FieldCell, Ribbon, RibbonBtn, RibbonGroup } from "@/components/erp/ui";
+import { trpc } from "@/lib/trpc";
+import { ROLES, ROLE_LABELS } from "@shared/erp";
+
+const PERMISSIONS: Record<string, string[]> = {
+  owner: ["كل الصلاحيات"],
+  branch_manager: ["بيع", "شراء", "مخزون", "تقارير", "صندوق", "حسابات"],
+  accountant: ["بيع (قراءة)", "شراء", "تقارير", "صندوق", "حسابات", "أعمار الديون"],
+  pharmacist: ["بيع", "مخزون (قراءة)", "وصفات", "تقارير البيع"],
+  technician: ["بيع", "وصفات"],
+  purchase_manager: ["شراء", "مخزون", "تقارير"],
+  staff: ["بيع", "وصفات"],
+};
+
+export function UsersPage({ audit = false }: { audit?: boolean }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const users = trpc.erp.masterdata.users.list.useQuery({});
+  const auditLogs = trpc.erp.masterdata.audit.list.useQuery({});
+
+  if (audit) {
+    const rows = (auditLogs.data ?? []).map((a: any) => ({
+      id: a.id,
+      time: a.createdAt ? new Date(a.createdAt).toLocaleString("en-GB", { timeZone: "Asia/Riyadh" }) : "",
+      user: `مستخدم #${a.userId}`,
+      action: a.action,
+      doc: `${a.refKind ?? ""}#${a.refId ?? ""}`,
+      details: a.detail ? JSON.stringify(a.detail).slice(0, 80) : "—",
+    }));
+    return (
+      <DocShell title="سجل العمليات (Audit Trail)">
+        <Ribbon>
+          <RibbonGroup label="السجل">
+            <RibbonBtn icon="🔍" label="بحث" />
+            <RibbonBtn icon="📅" label="فلترة بالتاريخ" />
+            <RibbonBtn icon="🖨" label="طباعة" />
+          </RibbonGroup>
+        </Ribbon>
+        <DataTable
+          data={rows}
+          columns={[
+            { key: "time", title: "الوقت", width: 160 },
+            { key: "user", title: "المستخدم", width: 150 },
+            { key: "action", title: "العملية", width: 160 },
+            { key: "doc", title: "الوثيقة", width: 150 },
+            { key: "details", title: "التفاصيل", width: 260 },
+          ]}
+          rowKey={(r: any) => r.id}
+          selected={selected}
+          onSelect={setSelected}
+          height={440}
+        />
+      </DocShell>
+    );
+  }
+
+  const rows = (users.data ?? []).map((u: any) => ({
+    id: u.id,
+    name: u.user?.name ?? `مستخدم #${u.userId}`,
+    username: u.user?.email ?? "",
+    role: u.role,
+    roleLabel: ROLE_LABELS[u.role] ?? u.role,
+    branch: u.branchId ? `فرع #${u.branchId}` : "كل الفروع",
+    lastLogin: "—",
+    active: true,
+  }));
+
+  return (
+    <DocShell title="المستخدمون والأدوار (RBAC)">
+      <Ribbon>
+        <RibbonGroup label="المستخدم">
+          <RibbonBtn icon="➕" label="مستخدم جديد" primary />
+          <RibbonBtn icon="🔑" label="إعادة تعيين كلمة المرور" />
+          <RibbonBtn icon="🚫" label="إيقاف/تفعيل" />
+        </RibbonGroup>
+      </Ribbon>
+
+      <div className="doc-head four">
+        <div className="block">
+          <div className="block-title">بيانات المستخدم</div>
+          <div className="field-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <FieldCell label="الاسم"><ErpInput placeholder="الاسم الكامل" /></FieldCell>
+            <FieldCell label="البريد"><ErpInput placeholder="email@sharaf.sa" /></FieldCell>
+          </div>
+        </div>
+        <div className="block">
+          <div className="block-title">الدور والفرع</div>
+          <div className="field-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <FieldCell label="الدور"><ErpSelect options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))} /></FieldCell>
+            <FieldCell label="الفرع"><ErpSelect options={[{ value: "1", label: "الفرع الرئيسي" }, { value: "2", label: "الفرع 2" }]} /></FieldCell>
+          </div>
+        </div>
+        <div className="block">
+          <div className="block-title">قواعد الصلاحية</div>
+          <div style={{ fontSize: 12, lineHeight: "17px", padding: "2px 0" }}>
+            {ROLES.filter((r) => r !== "owner").slice(0, 3).map((r) => (
+              <div key={r}><b>{ROLE_LABELS[r]}:</b> {PERMISSIONS[r]?.slice(0, 4).join(" • ") ?? ""}</div>
+            ))}
+          </div>
+        </div>
+        <div className="block">
+          <div className="block-title">أمان إضافي</div>
+          <div style={{ fontSize: 12, padding: 3 }}>تسجيل كل تعديل/حذف في Audit Trail — لا حذف نهائي إلا للمالك</div>
+        </div>
+      </div>
+
+      <DataTable
+        data={rows}
+        columns={[
+          { key: "name", title: "الاسم", width: 200 },
+          { key: "username", title: "البريد", width: 200 },
+          { key: "roleLabel", title: "الدور", width: 130, render: (r: any) => <span className={`status-badge ${r.role === "owner" ? "status-final" : "status-posted"}`}>{r.roleLabel}</span> },
+          { key: "branch", title: "الفرع", width: 140 },
+          { key: "lastLogin", title: "آخر دخول", width: 150 },
+          { key: "active", title: "نشط", width: 80, render: (r: any) => <span className={`status-badge ${r.active ? "status-posted" : "status-cancelled"}`}>{r.active ? "نعم" : "لا"}</span> },
+        ]}
+        rowKey={(r: any) => r.id}
+        selected={selected}
+        onSelect={setSelected}
+        height={320}
+      />
+    </DocShell>
+  );
+}
