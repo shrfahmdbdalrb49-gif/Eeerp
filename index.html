@@ -12,14 +12,14 @@
   <div class="main-ribbon">
     <div class="ribbon-logo">شرف ERP</div>
     <nav class="ribbon-menu">
-      <button class="menu-item active" data-menu="dashboard">لوحة التحكم</button>
-      <button class="menu-item" data-menu="sales">المبيعات</button>
-      <button class="menu-item" data-menu="purchases">المشتريات</button>
-      <button class="menu-item" data-menu="inventory">المخزون</button>
-      <button class="menu-item" data-menu="insurance">التأمين</button>
-      <button class="menu-item" data-menu="accounting">الحسابات</button>
-      <button class="menu-item" data-menu="reports">التقارير</button>
-      <button class="menu-item" data-menu="admin">الإدارة</button>
+      <button class="menu-item active" data-menu="dashboard" onclick="switchMenu(this)">لوحة التحكم</button>
+      <button class="menu-item" data-menu="sales" onclick="switchMenu(this)">المبيعات</button>
+      <button class="menu-item" data-menu="purchases" onclick="switchMenu(this)">المشتريات</button>
+      <button class="menu-item" data-menu="inventory" onclick="switchMenu(this)">المخزون</button>
+      <button class="menu-item" data-menu="insurance" onclick="switchMenu(this)">التأمين</button>
+      <button class="menu-item" data-menu="accounting" onclick="switchMenu(this)">الحسابات</button>
+      <button class="menu-item" data-menu="reports" onclick="switchMenu(this)">التقارير</button>
+      <button class="menu-item" data-menu="admin" onclick="switchMenu(this)">الإدارة</button>
     </nav>
   </div>
 
@@ -51,6 +51,11 @@
       <span class="tool-label">بحث</span>
       <span class="tool-shortcut">(F3)</span>
     </button>
+    <button class="tool-btn" onclick="openItemsScreen()" title="الأصناف">
+      <span class="tool-icon">💊</span>
+      <span class="tool-label">الأصناف</span>
+      <span class="tool-shortcut"></span>
+    </button>
     <button class="tool-btn" onclick="handleClose()" title="إغلاق (Esc)">
       <span class="tool-icon">❌</span>
       <span class="tool-label">إغلاق</span>
@@ -64,52 +69,52 @@
     <!-- القائمة الجانبية -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <span>القائمة</span>
+        <span id="sidebarTitle">المبيعات</span>
         <button class="sidebar-toggle" onclick="toggleSidebar()">◀</button>
       </div>
       <ul class="sidebar-menu" id="sidebarMenu">
         <li class="sidebar-section">المبيعات</li>
-        <li class="sidebar-item active" onclick="showPage( pos )">نقطة البيع POS</li>
-        <li class="sidebar-item" onclick="showPage( customers )">العملاء (المرضى)</li>
-        <li class="sidebar-item" onclick="showPage( doctors )">الأطباء</li>
-        <li class="sidebar-item" onclick="showPage( prescriptions )">الوصفات الطبية</li>
-        <li class="sidebar-item" onclick="showPage( invoices )">فواتير المبيعات</li>
-        <li class="sidebar-item" onclick="showPage( returns )">مرتجعات المبيعات</li>
-        <li class="sidebar-item" onclick="showPage( collections )">التحصيل</li>
+        <li class="sidebar-item active" onclick="showPage( pos , this)">نقطة البيع POS</li>
+        <li class="sidebar-item" onclick="showPage( customers , this)">العملاء (المرضى)</li>
+        <li class="sidebar-item" onclick="showPage( doctors , this)">الأطباء</li>
+        <li class="sidebar-item" onclick="showPage( prescriptions , this)">الوصفات الطبية</li>
+        <li class="sidebar-item" onclick="showPage( invoices , this)">فواتير المبيعات</li>
+        <li class="sidebar-item" onclick="showPage( returns , this)">مرتجعات المبيعات</li>
+        <li class="sidebar-item" onclick="showPage( collections , this)">التحصيل</li>
         <li class="sidebar-section">المشتريات</li>
-        <li class="sidebar-item" onclick="showPage( suppliers )">الموردون</li>
-        <li class="sidebar-item" onclick="showPage( purchase-orders )">طلبات الشراء</li>
-        <li class="sidebar-item" onclick="showPage( purchase-invoices )">فواتير المشتريات</li>
+        <li class="sidebar-item" onclick="showPage( suppliers , this)">الموردون</li>
+        <li class="sidebar-item" onclick="showPage( purchase-orders , this)">طلبات الشراء</li>
+        <li class="sidebar-item" onclick="showPage( purchase-invoices , this)">فواتير المشتريات</li>
         <li class="sidebar-section">المخزون</li>
-        <li class="sidebar-item" onclick="showPage( items )">الأصناف</li>
-        <li class="sidebar-item" onclick="showPage( warehouses )">المخازن</li>
-        <li class="sidebar-item" onclick="showPage( expiry )">مراقبة الصلاحية</li>
-        <li class="sidebar-item" onclick="showPage( stocktake )">الجرد</li>
+        <li class="sidebar-item" onclick="showPage( items , this)">الأصناف</li>
+        <li class="sidebar-item" onclick="showPage( warehouses , this)">المخازن</li>
+        <li class="sidebar-item" onclick="showPage( expiry , this)">مراقبة الصلاحية</li>
+        <li class="sidebar-item" onclick="showPage( stocktake , this)">الجرد</li>
         <li class="sidebar-section">الحسابات</li>
-        <li class="sidebar-item" onclick="showPage( accounts )">دليل الحسابات</li>
-        <li class="sidebar-item" onclick="showPage( journal )">القيود اليومية</li>
-        <li class="sidebar-item" onclick="showPage( treasury )">الصندوق والبنوك</li>
+        <li class="sidebar-item" onclick="showPage( accounts , this)">دليل الحسابات</li>
+        <li class="sidebar-item" onclick="showPage( journal , this)">القيود اليومية</li>
+        <li class="sidebar-item" onclick="showPage( treasury , this)">الصندوق والبنوك</li>
         <li class="sidebar-section">التقارير</li>
-        <li class="sidebar-item" onclick="showPage( reports-sales )">تقارير المبيعات</li>
-        <li class="sidebar-item" onclick="showPage( reports-inventory )">تقارير المخزون</li>
-        <li class="sidebar-item" onclick="showPage( reports-financial )">التقارير المالية</li>
+        <li class="sidebar-item" onclick="showPage( reports-sales , this)">تقارير المبيعات</li>
+        <li class="sidebar-item" onclick="showPage( reports-inventory , this)">تقارير المخزون</li>
+        <li class="sidebar-item" onclick="showPage( reports-financial , this)">التقارير المالية</li>
       </ul>
     </aside>
 
     <!-- مساحة العمل -->
     <main class="workspace" id="workspace">
 
-      <!-- نافذة فاتورة المبيعات -->
+      <!-- ========== نافذة فاتورة المبيعات ========== -->
       <div class="window-frame maximized" id="window-sales">
         <div class="window-title-bar">
-          <span>فاتورة مبيعات #INV-2024-001</span>
+          <span id="salesWindowTitle">فاتورة مبيعات #INV-2024-001</span>
           <div class="window-status">
             <span class="badge badge-draft" id="invoiceStatus">مسودة</span>
           </div>
           <div class="window-controls">
-            <button onclick="minimizeWindow()" title="تصغير">─</button>
-            <button onclick="maximizeWindow()" title="تكبير">□</button>
-            <button onclick="handleClose()" title="إغلاق">✕</button>
+            <button onclick="minimizeWindow( window-sales )" title="تصغير">─</button>
+            <button onclick="maximizeWindow( window-sales )" title="تكبير">□</button>
+            <button onclick="closeWindow( window-sales )" title="إغلاق">✕</button>
           </div>
         </div>
 
@@ -149,18 +154,18 @@
                 <label>المريض</label>
                 <div class="input-with-search">
                   <input type="text" class="input-field" placeholder="ابحث عن مريض..." id="patientSearch" />
-                  <button class="search-btn" onclick="openLookup( patient )" title="بحث (Ctrl+Shift+L)">🔍</button>
+                  <button class="search-btn" onclick="openLookupModal( patient )">🔍</button>
                 </div>
               </div>
               <div class="field-row">
                 <label>رقم الهاتف</label>
-                <input type="text" class="input-field" placeholder="777XXXXXX" />
+                <input type="text" class="input-field" placeholder="777XXXXXX" id="patientPhone" />
               </div>
               <div class="field-row">
                 <label>الطبيب</label>
                 <div class="input-with-search">
-                  <input type="text" class="input-field" placeholder="اسم الطبيب..." />
-                  <button class="search-btn" onclick="openLookup( doctor )">🔍</button>
+                  <input type="text" class="input-field" placeholder="اسم الطبيب..." id="doctorSearch" />
+                  <button class="search-btn" onclick="openLookupModal( doctor )">🔍</button>
                 </div>
               </div>
               <div class="field-row">
@@ -209,16 +214,16 @@
               <thead>
                 <tr>
                   <th style="width:30px">#</th>
-                  <th style="width:200px">الصنف</th>
+                  <th style="width:180px">الصنف</th>
                   <th style="width:100px">الباركود</th>
-                  <th style="width:60px">الوحدة</th>
-                  <th style="width:80px">التشغيلة</th>
+                  <th style="width:55px">الوحدة</th>
+                  <th style="width:75px">التشغيلة</th>
                   <th style="width:80px">الصلاحية</th>
-                  <th style="width:60px">الكمية</th>
-                  <th style="width:80px">السعر</th>
-                  <th style="width:50px">خصم%</th>
-                  <th style="width:50px">ضريبة%</th>
-                  <th style="width:90px">الإجمالي</th>
+                  <th style="width:55px">الكمية</th>
+                  <th style="width:75px">السعر</th>
+                  <th style="width:45px">خصم%</th>
+                  <th style="width:45px">ضريبة%</th>
+                  <th style="width:85px">الإجمالي</th>
                   <th style="width:30px">حذف</th>
                 </tr>
               </thead>
@@ -336,19 +341,134 @@
         </div>
       </div>
 
+      <!-- ========== نافذة الأصناف ========== -->
+      <div class="window-frame" id="window-items" style="display:none; top:30px; right:30px; bottom:30px; left:250px;">
+        <div class="window-title-bar">
+          <span>الأصناف - الأدوية والمستلزمات</span>
+          <div class="window-status">
+            <span class="badge badge-posted" id="itemsCount">0 صنف</span>
+          </div>
+          <div class="window-controls">
+            <button onclick="minimizeWindow( window-items )" title="تصغير">─</button>
+            <button onclick="maximizeWindow( window-items )" title="تكبير">□</button>
+            <button onclick="closeWindow( window-items )" title="إغلاق">✕</button>
+          </div>
+        </div>
+        <div class="window-body">
+          <!-- شريط بحث الأصناف -->
+          <div class="items-toolbar">
+            <input type="text" class="input-field" id="itemsGlobalSearch" placeholder="🔍 بحث بالاسم، الكود، الباركود، الاسم العلمي..." oninput="filterItemsTable()" style="flex:1; max-width:400px;" />
+            <select class="input-field" id="itemsCategoryFilter" onchange="filterItemsTable()" style="width:150px;">
+              <option value="">كل المجموعات</option>
+              <option value="مسكنات">مسكنات</option>
+              <option value="مضادات حيوية">مضادات حيوية</option>
+              <option value="أمراض مزمنة">أمراض مزمنة</option>
+              <option value="فيتامينات">فيتامينات</option>
+              <option value="أخرى">أخرى</option>
+            </select>
+            <select class="input-field" id="itemsStockFilter" onchange="filterItemsTable()" style="width:130px;">
+              <option value="">كل الأصناف</option>
+              <option value="low">رصيد منخفض</option>
+              <option value="out">نفذ من المخزون</option>
+              <option value="expiring">ينتهي قريباً</option>
+            </select>
+            <button class="btn btn-primary" onclick="addNewItem()">+ صنف جديد</button>
+          </div>
+
+          <!-- جدول الأصناف -->
+          <div class="table-container" style="flex:1;">
+            <table class="dense-table" id="itemsMasterTable">
+              <thead>
+                <tr>
+                  <th style="width:30px">#</th>
+                  <th style="width:70px">الكود</th>
+                  <th style="width:160px">الاسم التجاري</th>
+                  <th style="width:140px">الاسم العلمي</th>
+                  <th style="width:100px">الباركود</th>
+                  <th style="width:80px">المجموعة</th>
+                  <th style="width:50px">الوحدة</th>
+                  <th style="width:70px">سعر الشراء</th>
+                  <th style="width:70px">سعر البيع</th>
+                  <th style="width:50px">الرصيد</th>
+                  <th style="width:50px">الحد الأدنى</th>
+                  <th style="width:70px">أقرب صلاحية</th>
+                  <th style="width:50px">وصفة؟</th>
+                  <th style="width:60px">الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="itemsMasterBody">
+              </tbody>
+            </table>
+          </div>
+
+          <!-- شريط معلومات الأصناف -->
+          <div class="totals-bar">
+            <div class="totals-right">
+              <div class="total-item">
+                <span class="total-label">إجمالي الأصناف:</span>
+                <span class="total-value" id="totalProducts">0</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">رصيد منخفض:</span>
+                <span class="total-value" id="lowStockCount" style="color:var(--color-warning)">0</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">نفذ:</span>
+                <span class="total-value" id="outOfStockCount" style="color:var(--color-error)">0</span>
+              </div>
+            </div>
+            <div class="totals-left">
+              <div class="total-item">
+                <span class="total-label">قيمة المخزون:</span>
+                <span class="total-net" id="inventoryValue">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 
   <!-- ===== شريط المهام السفلي ===== -->
   <div class="taskbar">
-    <div class="taskbar-item active" id="taskbar-win-1" onclick="activateWindow( win-1 )">
+    <div class="taskbar-item active" id="taskbar-sales" onclick="activateWindow( window-sales )">
       📄 فاتورة مبيعات #INV-2024-001
+    </div>
+    <div class="taskbar-item" id="taskbar-items" onclick="activateWindow( window-items )" style="display:none;">
+      💊 الأصناف
     </div>
     <div class="taskbar-spacer"></div>
     <div class="taskbar-info">
       <span id="currentUser">👤 مدير النظام</span>
       <span id="currentBranch">🏥 الفرع الرئيسي</span>
       <span id="currentTime"></span>
+    </div>
+  </div>
+
+  <!-- ===== Lookup Modal (نافذة البحث الموحدة) ===== -->
+  <div class="lookup-overlay" id="lookupOverlay" style="display:none;" onclick="closeLookupModal(event)">
+    <div class="lookup-modal" onclick="event.stopPropagation()">
+      <div class="lookup-header">
+        <span id="lookupTitle">اختيار الصنف</span>
+        <span class="lookup-count" id="lookupCount">0 نتيجة</span>
+        <button class="lookup-close" onclick="closeLookupModal()">✕</button>
+      </div>
+      <div class="lookup-search">
+        <input type="text" class="input-field" id="lookupSearchInput" placeholder="ابحث بالاسم، الكود، الهاتف، الرقم الضريبي..." oninput="filterLookupResults()" autofocus />
+      </div>
+      <div class="lookup-body">
+        <table class="dense-table" id="lookupTable">
+          <thead id="lookupThead">
+          </thead>
+          <tbody id="lookupTbody">
+          </tbody>
+        </table>
+      </div>
+      <div class="lookup-footer">
+        <button class="btn btn-primary" onclick="createNewFromLookup()">+ إنشاء جديد</button>
+        <button class="btn btn-secondary" onclick="closeLookupModal()">إلغاء (Esc)</button>
+      </div>
     </div>
   </div>
 
