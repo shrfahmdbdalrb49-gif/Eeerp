@@ -2,7 +2,7 @@
   <!-- ===== القائمة الجانبية (Sidebar) ===== -->
   <aside class="sidebar" :class="{ collapsed }">
     <div class="sidebar-header">
-      <span v-if="!collapsed">{{ headerLabel }}</span>
+      <span v-if="!collapsed">{{ currentHeaderLabel }}</span>
       <button
         class="sidebar-toggle"
         @click="$emit('toggle')"
@@ -54,6 +54,8 @@ const props = defineProps({
     default: null,
   },
 })
+
+import { computed } from 'vue'
 
 defineEmits(['toggle', 'select'])
 
@@ -163,4 +165,6 @@ const sectionsByMenu = {
 }
 
 const currentSections = sectionsByMenu[props.activeMenu] ?? sectionsByMenu.dashboard
+
+const currentHeaderLabel = computed(() => headerLabel[props.activeMenu] ?? 'القائمة')
 </script>
