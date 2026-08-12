@@ -1,0 +1,636 @@
+/*
+ * Sharaf Design System — ERP Desktop-First
+ * 8px grid, Arial only, high information density, accounting-tool aesthetic.
+ * No gradients, no large shadows, radius 2–4px. RTL-first.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--sharaf-bg);
+  --color-foreground: #1a1a1a;
+  --color-primary: var(--sharaf-main);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--sharaf-header);
+  --color-secondary-foreground: #1a1a1a;
+  --color-muted: var(--sharaf-header);
+  --color-muted-foreground: #555;
+  --color-accent: #eef3f9;
+  --color-accent-foreground: var(--sharaf-main);
+  --color-destructive: var(--sharaf-danger);
+  --color-border: var(--sharaf-border);
+  --color-input: var(--sharaf-border);
+  --color-ring: var(--sharaf-main);
+  --color-success: var(--sharaf-success);
+  --color-warning: var(--sharaf-warning);
+  --radius: 3px;
+  --font-sans: "Arial", "Helvetica Neue", sans-serif;
+}
+
+:root {
+  /* Sharaf ERP palette (exact hex from spec) */
+  --sharaf-bg: #ffffff;
+  --sharaf-header: #f0f2f5;
+  --sharaf-main: #0d5aa7;
+  --sharaf-success: #1b5e20;
+  --sharaf-warning: #e65100;
+  --sharaf-danger: #b71c1c;
+  --sharaf-border: #d0d5dd;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html,
+body {
+  font-family: "Arial", "Helvetica Neue", sans-serif;
+  font-size: 13px;
+  background: var(--sharaf-bg);
+  color: #1a1a1a;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+* {
+  border-radius: 3px;
+}
+
+button {
+  transition: transform 150ms var(--ease-out), filter 150ms var(--ease-out),
+    background-color 150ms var(--ease-out);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* ===== UI primitives ===== */
+
+.erp-input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--sharaf-border);
+  background: #fff;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  outline: none;
+  border-radius: 3px;
+  min-width: 0;
+}
+
+.erp-input:focus {
+  border-color: var(--sharaf-main);
+  box-shadow: inset 0 0 0 1px var(--sharaf-main);
+}
+
+.erp-btn {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--sharaf-border);
+  background: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.erp-btn-primary {
+  background: var(--sharaf-main);
+  color: #fff;
+  border-color: var(--sharaf-main);
+}
+
+.erp-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.erp-btn-success {
+  background: var(--sharaf-success);
+  color: #fff;
+  border-color: var(--sharaf-success);
+}
+
+.erp-btn-danger {
+  color: var(--sharaf-danger);
+  border-color: var(--sharaf-danger);
+}
+
+.erp-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.erp-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #333;
+}
+
+.erp-section-title {
+  background: var(--sharaf-header);
+  border: 1px solid var(--sharaf-border);
+  border-right: 3px solid var(--sharaf-main);
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ===== Tables ===== */
+
+.erp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.erp-table th {
+  background: var(--sharaf-header);
+  border: 1px solid var(--sharaf-border);
+  font-size: 12px;
+  font-weight: bold;
+  text-align: right;
+  padding: 4px 6px;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+}
+
+.erp-table td {
+  border: 1px solid var(--sharaf-border);
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+
+.erp-table tr.selected td {
+  background: #e3eff9;
+}
+
+.erp-table tr:hover td {
+  background: #f7fafc;
+}
+
+.erp-table td.num {
+  text-align: left;
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Status pills ===== */
+
+.status-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 2px;
+  border: 1px solid;
+}
+
+.status-draft {
+  color: #666;
+  border-color: #ccc;
+  background: #f5f5f5;
+}
+
+.status-final {
+  color: var(--sharaf-main);
+  border-color: var(--sharaf-main);
+  background: #eaf2fa;
+}
+
+.status-posted {
+  color: var(--sharaf-success);
+  border-color: var(--sharaf-success);
+  background: #e8f2e9;
+}
+
+.status-cancelled {
+  color: var(--sharaf-danger);
+  border-color: var(--sharaf-danger);
+  background: #fae8e8;
+}
+
+/* ===== Alerts bar in POS ===== */
+
+.pos-alert-row {
+  border: 1px solid var(--sharaf-warning);
+  background: #fff4e6;
+  color: var(--sharaf-warning);
+  font-size: 12px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pos-alert-row.high {
+  border-color: var(--sharaf-danger);
+  background: #fdecea;
+  color: var(--sharaf-danger);
+}
+
+/* ===== Totals bar ===== */
+
+.totals-bar {
+  background: var(--sharaf-header);
+  border-top: 2px solid var(--sharaf-main);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 13px;
+}
+
+.totals-bar .net {
+  font-size: 17px;
+  font-weight: bold;
+  color: var(--sharaf-main);
+}
+
+/* ===== MDI window chrome ===== */
+
+.mdi-titlebar {
+  background: var(--sharaf-header);
+  border-bottom: 1px solid var(--sharaf-border);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+}
+
+.mdi-titlebar .title {
+  font-size: 13px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdi-titlebar button {
+  height: 24px;
+  min-width: 26px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+/* ===== Ribbon ===== */
+
+.ribbon-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 2px 10px;
+  border-left: 1px solid var(--sharaf-border);
+  flex-wrap: wrap;
+}
+
+.ribbon-btn {
+  height: 52px;
+  min-width: 54px;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+}
+
+.ribbon-btn:hover {
+  border-color: var(--sharaf-border);
+  background: var(--sharaf-header);
+}
+
+.ribbon-btn .rb-icon {
+  font-size: 16px;
+}
+
+/* ===== Tabs ===== */
+
+.erp-tab {
+  padding: 4px 12px;
+  font-size: 13px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.erp-tab.active {
+  background: #fff;
+  border-color: var(--sharaf-border);
+  font-weight: bold;
+  color: var(--sharaf-main);
+  margin-bottom: -1px;
+}
+
+/* ===== Keyboard hint ===== */
+
+kbd {
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  border: 1px solid var(--sharaf-border);
+  border-bottom-width: 2px;
+  border-radius: 2px;
+  padding: 0 4px;
+  background: var(--sharaf-header);
+  color: #444;
+}
+
+/* ===== Scrollbars ===== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c4cad2;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ===== Print ===== */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ===== Expiry age coloring ===== */
+
+.expiry-ok {
+  color: var(--sharaf-success);
+  font-weight: bold;
+}
+
+.expiry-warn-60 {
+  color: #f9a825;
+  font-weight: bold;
+}
+
+.expiry-warn-30 {
+  color: var(--sharaf-warning);
+  font-weight: bold;
+}
+
+.expiry-danger {
+  color: var(--sharaf-danger);
+  font-weight: bold;
+}
+
+/* ===== Ledger balance indicator ===== */
+
+.balance-ok {
+  color: var(--sharaf-success);
+  font-weight: bold;
+}
+
+.balance-bad {
+  color: var(--sharaf-danger);
+  font-weight: bold;
+}
+
+/* ===== LookupModal (80%×85%) ===== */
+.lookup-modal {
+  width: 80vw;
+  height: 85vh;
+  background: #fff;
+  border: 1px solid var(--sharaf-border);
+  box-shadow: 0 12px 40px rgba(13, 90, 167, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+
+.lookup-modal .lm-head {
+  background: var(--sharaf-main);
+  color: #fff;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lookup-modal .lm-head input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ===== Document header blocks ===== */
+.doc-head {
+  border: 1px solid var(--sharaf-border);
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  background: #fbfcfd;
+}
+
+.doc-head.three {
+  grid-template-columns: 1fr 1.1fr 1fr;
+}
+
+.doc-head.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.doc-head .block {
+  border: 1px solid var(--sharaf-border);
+  background: #fff;
+  padding: 5px 7px;
+}
+
+.doc-head .block-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--sharaf-main);
+  margin-bottom: 4px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px 8px;
+  align-items: end;
+}
+
+.field-cell label {
+  display: block;
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 1px;
+}
+
+.field-cell .erp-input {
+  width: 100%;
+}
+
+/* ===== MDI dock / taskbar ===== */
+.mdi-dock {
+  background: var(--sharaf-header);
+  border-top: 1px solid var(--sharaf-border);
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  overflow-x: auto;
+}
+
+.mdi-dock button {
+  height: 24px;
+  font-size: 11px;
+  padding: 0 10px;
+  border: 1px solid var(--sharaf-border);
+  background: #fff;
+}
+
+.mdi-dock button.active {
+  background: var(--sharaf-main);
+  color: #fff;
+  border-color: var(--sharaf-main);
+}
+
+/* ===== Sidebar accordion ===== */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: right;
+  padding: 6px 12px;
+  font-size: 13px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #222;
+}
+
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-item.active {
+  background: var(--sharaf-main);
+  color: #fff;
+  font-weight: bold;
+}
+
+.sidebar-item .kbd-hint {
+  margin-inline-start: auto;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* ===== Tooltip card (supplier info) ===== */
+.tooltip-card {
+  position: absolute;
+  z-index: 60;
+  background: #fff;
+  border: 1px solid var(--sharaf-border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  padding: 8px 10px;
+  font-size: 12px;
+  min-width: 220px;
+}
+
+.tooltip-card .tc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 1px 0;
+}
+
+/* ===== Notifications drawer ===== */
+.alert-banner {
+  border: 1px solid var(--sharaf-warning);
+  background: #fff8ef;
+  color: #7c3a00;
+  font-size: 12px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===== AI assistant ===== */
+.ai-chip {
+  position: fixed;
+  bottom: 14px;
+  inset-inline-start: 14px;
+  z-index: 100;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: var(--sharaf-main);
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(13, 90, 167, 0.35);
+}
+
+.ai-panel {
+  position: fixed;
+  bottom: 72px;
+  inset-inline-start: 14px;
+  z-index: 100;
+  width: 400px;
+  height: 520px;
+  max-height: calc(100vh - 100px);
+  background: #fff;
+  border: 1px solid var(--sharaf-border);
+  box-shadow: 0 12px 40px rgba(13, 90, 167, 0.22);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Autocomplete dropdown ===== */
+.ac-dropdown {
+  position: absolute;
+  z-index: 50;
+  background: #fff;
+  border: 1px solid var(--sharaf-border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  max-height: 260px;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.ac-dropdown div {
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ac-dropdown div:hover,
+.ac-dropdown div.kb-selected {
+  background: #e3eff9;
+}
+
+/* ===== Empty / center hint ===== */
+.empty-hint {
+  color: #8a93a0;
+  text-align: center;
+  padding: 30px;
+  font-size: 13px;
+}
+
+/* ===== Focus visible for keyboard-first ===== */
+:focus-visible {
+  outline: 2px solid var(--sharaf-main);
+  outline-offset: -2px;
+}
