@@ -1,0 +1,14 @@
+{
+  "name": "sharaf-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "نظام شرف ERP لإدارة الصيدليات",
+  "scripts": {
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "preview": "cd apps/web && npm run preview"
+  },
+  "keywords": ["erp", "pharmacy", "saas"],
+  "author": "Sharaf Team",
+  "license": "MIT"
+}
