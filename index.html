@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>شرف ERP - نظام إدارة الصيدليات</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== الشريط العلوي الرئيسي ===== -->
+  <div class="main-ribbon">
+    <div class="ribbon-logo">شرف ERP</div>
+    <nav class="ribbon-menu">
+      <button class="menu-item active" data-menu="dashboard">لوحة التحكم</button>
+      <button class="menu-item" data-menu="sales">المبيعات</button>
+      <button class="menu-item" data-menu="purchases">المشتريات</button>
+      <button class="menu-item" data-menu="inventory">المخزون</button>
+      <button class="menu-item" data-menu="insurance">التأمين</button>
+      <button class="menu-item" data-menu="accounting">الحسابات</button>
+      <button class="menu-item" data-menu="reports">التقارير</button>
+      <button class="menu-item" data-menu="admin">الإدارة</button>
+    </nav>
+  </div>
+
+  <!-- ===== شريط الأدوات ===== -->
+  <div class="toolbar">
+    <button class="tool-btn" onclick="handleNew()" title="جديد (F2)">
+      <span class="tool-icon">📄</span>
+      <span class="tool-label">جديد</span>
+      <span class="tool-shortcut">(F2)</span>
+    </button>
+    <button class="tool-btn" onclick="handleSave()" title="حفظ (F8)">
+      <span class="tool-icon">💾</span>
+      <span class="tool-label">حفظ</span>
+      <span class="tool-shortcut">(F8)</span>
+    </button>
+    <button class="tool-btn" onclick="handlePost()" title="ترحيل (F10)">
+      <span class="tool-icon">✅</span>
+      <span class="tool-label">ترحيل</span>
+      <span class="tool-shortcut">(F10)</span>
+    </button>
+    <button class="tool-btn" onclick="handlePrint()" title="طباعة (Ctrl+P)">
+      <span class="tool-icon">🖨️</span>
+      <span class="tool-label">طباعة</span>
+      <span class="tool-shortcut">(Ctrl+P)</span>
+    </button>
+    <div class="tool-separator"></div>
+    <button class="tool-btn" onclick="handleSearch()" title="بحث (F3)">
+      <span class="tool-icon">🔍</span>
+      <span class="tool-label">بحث</span>
+      <span class="tool-shortcut">(F3)</span>
+    </button>
+    <button class="tool-btn" onclick="handleClose()" title="إغلاق (Esc)">
+      <span class="tool-icon">❌</span>
+      <span class="tool-label">إغلاق</span>
+      <span class="tool-shortcut">(Esc)</span>
+    </button>
+  </div>
+
+  <!-- ===== الحاوية الرئيسية ===== -->
+  <div class="main-container">
+
+    <!-- القائمة الجانبية -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span>القائمة</span>
+        <button class="sidebar-toggle" onclick="toggleSidebar()">◀</button>
+      </div>
+      <ul class="sidebar-menu" id="sidebarMenu">
+        <li class="sidebar-section">المبيعات</li>
+        <li class="sidebar-item active" onclick="showPage( pos )">نقطة البيع POS</li>
+        <li class="sidebar-item" onclick="showPage( customers )">العملاء (المرضى)</li>
+        <li class="sidebar-item" onclick="showPage( doctors )">الأطباء</li>
+        <li class="sidebar-item" onclick="showPage( prescriptions )">الوصفات الطبية</li>
+        <li class="sidebar-item" onclick="showPage( invoices )">فواتير المبيعات</li>
+        <li class="sidebar-item" onclick="showPage( returns )">مرتجعات المبيعات</li>
+        <li class="sidebar-item" onclick="showPage( collections )">التحصيل</li>
+        <li class="sidebar-section">المشتريات</li>
+        <li class="sidebar-item" onclick="showPage( suppliers )">الموردون</li>
+        <li class="sidebar-item" onclick="showPage( purchase-orders )">طلبات الشراء</li>
+        <li class="sidebar-item" onclick="showPage( purchase-invoices )">فواتير المشتريات</li>
+        <li class="sidebar-section">المخزون</li>
+        <li class="sidebar-item" onclick="showPage( items )">الأصناف</li>
+        <li class="sidebar-item" onclick="showPage( warehouses )">المخازن</li>
+        <li class="sidebar-item" onclick="showPage( expiry )">مراقبة الصلاحية</li>
+        <li class="sidebar-item" onclick="showPage( stocktake )">الجرد</li>
+        <li class="sidebar-section">الحسابات</li>
+        <li class="sidebar-item" onclick="showPage( accounts )">دليل الحسابات</li>
+        <li class="sidebar-item" onclick="showPage( journal )">القيود اليومية</li>
+        <li class="sidebar-item" onclick="showPage( treasury )">الصندوق والبنوك</li>
+        <li class="sidebar-section">التقارير</li>
+        <li class="sidebar-item" onclick="showPage( reports-sales )">تقارير المبيعات</li>
+        <li class="sidebar-item" onclick="showPage( reports-inventory )">تقارير المخزون</li>
+        <li class="sidebar-item" onclick="showPage( reports-financial )">التقارير المالية</li>
+      </ul>
+    </aside>
+
+    <!-- مساحة العمل -->
+    <main class="workspace" id="workspace">
+
+      <!-- نافذة فاتورة المبيعات -->
+      <div class="window-frame maximized" id="window-sales">
+        <div class="window-title-bar">
+          <span>فاتورة مبيعات #INV-2024-001</span>
+          <div class="window-status">
+            <span class="badge badge-draft" id="invoiceStatus">مسودة</span>
+          </div>
+          <div class="window-controls">
+            <button onclick="minimizeWindow()" title="تصغير">─</button>
+            <button onclick="maximizeWindow()" title="تكبير">□</button>
+            <button onclick="handleClose()" title="إغلاق">✕</button>
+          </div>
+        </div>
+
+        <div class="window-body">
+          <!-- رأس الفاتورة -->
+          <div class="invoice-header">
+            <div class="header-block">
+              <div class="block-title">بيانات الوثيقة</div>
+              <div class="field-row">
+                <label>رقم الفاتورة</label>
+                <input type="text" class="input-field" value="INV-2024-001" readonly />
+              </div>
+              <div class="field-row">
+                <label>التاريخ</label>
+                <input type="date" class="input-field" value="2024-12-01" />
+              </div>
+              <div class="field-row">
+                <label>الفرع</label>
+                <select class="input-field">
+                  <option>الفرع الرئيسي - صنعاء</option>
+                  <option>فرع عدن</option>
+                  <option>فرع تعز</option>
+                </select>
+              </div>
+              <div class="field-row">
+                <label>المخزن</label>
+                <select class="input-field">
+                  <option>المخزن الرئيسي</option>
+                  <option>مخزن الطوارئ</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="header-block">
+              <div class="block-title">بيانات المريض</div>
+              <div class="field-row">
+                <label>المريض</label>
+                <div class="input-with-search">
+                  <input type="text" class="input-field" placeholder="ابحث عن مريض..." id="patientSearch" />
+                  <button class="search-btn" onclick="openLookup( patient )" title="بحث (Ctrl+Shift+L)">🔍</button>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>رقم الهاتف</label>
+                <input type="text" class="input-field" placeholder="777XXXXXX" />
+              </div>
+              <div class="field-row">
+                <label>الطبيب</label>
+                <div class="input-with-search">
+                  <input type="text" class="input-field" placeholder="اسم الطبيب..." />
+                  <button class="search-btn" onclick="openLookup( doctor )">🔍</button>
+                </div>
+              </div>
+              <div class="field-row">
+                <label>رقم الوصفة</label>
+                <input type="text" class="input-field" placeholder="RX-XXXXX" />
+              </div>
+            </div>
+
+            <div class="header-block">
+              <div class="block-title">بيانات البيع</div>
+              <div class="field-row">
+                <label>طريقة الدفع</label>
+                <select class="input-field" id="paymentMethod">
+                  <option value="cash">نقدي</option>
+                  <option value="credit">آجل</option>
+                  <option value="insurance">تأمين</option>
+                  <option value="card">بطاقة</option>
+                </select>
+              </div>
+              <div class="field-row">
+                <label>نوع السعر</label>
+                <select class="input-field">
+                  <option>سعر بيع عادي</option>
+                  <option>سعر جملة</option>
+                  <option>سعر تأمين</option>
+                </select>
+              </div>
+              <div class="field-row">
+                <label>الخصم العام %</label>
+                <input type="number" class="input-field" value="0" min="0" max="100" id="generalDiscount" oninput="calculateTotals()" />
+              </div>
+              <div class="field-row">
+                <label>العملة</label>
+                <select class="input-field">
+                  <option>YER - ريال يمني</option>
+                  <option>USD - دولار أمريكي</option>
+                  <option>SAR - ريال سعودي</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- جدول الأصناف -->
+          <div class="table-container">
+            <table class="dense-table" id="itemsTable">
+              <thead>
+                <tr>
+                  <th style="width:30px">#</th>
+                  <th style="width:200px">الصنف</th>
+                  <th style="width:100px">الباركود</th>
+                  <th style="width:60px">الوحدة</th>
+                  <th style="width:80px">التشغيلة</th>
+                  <th style="width:80px">الصلاحية</th>
+                  <th style="width:60px">الكمية</th>
+                  <th style="width:80px">السعر</th>
+                  <th style="width:50px">خصم%</th>
+                  <th style="width:50px">ضريبة%</th>
+                  <th style="width:90px">الإجمالي</th>
+                  <th style="width:30px">حذف</th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody">
+                <tr>
+                  <td>1</td>
+                  <td><input type="text" class="table-input drug-search" placeholder="ابحث عن دواء..." onfocus="this.select()" oninput="searchDrug(this)" /></td>
+                  <td><input type="text" class="table-input barcode-input" placeholder="باركود" oninput="searchByBarcode(this)" /></td>
+                  <td><input type="text" class="table-input" value="علبة" readonly /></td>
+                  <td><input type="text" class="table-input" placeholder="LOT-001" /></td>
+                  <td><input type="date" class="table-input" /></td>
+                  <td><input type="number" class="table-input qty-input" value="1" min="1" oninput="calculateRow(this)" /></td>
+                  <td><input type="number" class="table-input price-input" value="0" oninput="calculateRow(this)" /></td>
+                  <td><input type="number" class="table-input disc-input" value="0" min="0" max="100" oninput="calculateRow(this)" /></td>
+                  <td><input type="number" class="table-input tax-input" value="0" min="0" max="100" oninput="calculateRow(this)" /></td>
+                  <td class="row-total">0</td>
+                  <td><button class="delete-btn" onclick="deleteRow(this)">✕</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- شريط الإجماليات -->
+          <div class="totals-bar">
+            <div class="totals-right">
+              <div class="total-item">
+                <span class="total-label">الأصناف:</span>
+                <span class="total-value" id="totalItems">1</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">الكميات:</span>
+                <span class="total-value" id="totalQty">1</span>
+              </div>
+            </div>
+            <div class="totals-center">
+              <div class="total-item">
+                <span class="total-label">الإجمالي:</span>
+                <span class="total-value" id="subtotal">0</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">الخصم:</span>
+                <span class="total-value" id="totalDiscount">0</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">الضريبة:</span>
+                <span class="total-value" id="totalTax">0</span>
+              </div>
+            </div>
+            <div class="totals-left">
+              <div class="total-item">
+                <span class="total-label">الصافي:</span>
+                <span class="total-net" id="netTotal">0</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">المدفوع:</span>
+                <input type="number" class="input-field paid-input" id="paidAmount" value="0" oninput="calculateRemaining()" style="width:100px" />
+              </div>
+              <div class="total-item">
+                <span class="total-label">المتبقي:</span>
+                <span class="total-value remaining" id="remaining">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- التبويبات السفلية -->
+          <div class="tabs">
+            <button class="tab active" onclick="switchTab(this,  details )">التفاصيل</button>
+            <button class="tab" onclick="switchTab(this,  payments )">الدفعات</button>
+            <button class="tab" onclick="switchTab(this,  journal )">القيود المحاسبية</button>
+            <button class="tab" onclick="switchTab(this,  history )">سجل التعديلات</button>
+          </div>
+          <div class="tab-content" id="tabContent">
+            <div class="tab-panel active" id="panel-details">
+              <p style="color: var(--color-text-secondary); padding: 10px;">تفاصيل إضافية للفاتورة...</p>
+            </div>
+            <div class="tab-panel" id="panel-payments" style="display:none">
+              <p style="color: var(--color-text-secondary); padding: 10px;">سجل الدفعات...</p>
+            </div>
+            <div class="tab-panel" id="panel-journal" style="display:none">
+              <table class="dense-table" style="margin-top:8px">
+                <thead>
+                  <tr>
+                    <th>الحساب</th>
+                    <th>البيان</th>
+                    <th>مدين</th>
+                    <th>دائن</th>
+                  </tr>
+                </thead>
+                <tbody id="journalBody">
+                  <tr>
+                    <td>الصندوق</td>
+                    <td>مبيعات نقدية</td>
+                    <td id="jDebit">0</td>
+                    <td>0</td>
+                  </tr>
+                  <tr>
+                    <td>المبيعات</td>
+                    <td>إيراد مبيعات</td>
+                    <td>0</td>
+                    <td id="jCreditSales">0</td>
+                  </tr>
+                  <tr>
+                    <td>ضريبة المبيعات</td>
+                    <td>ضريبة مستحقة</td>
+                    <td>0</td>
+                    <td id="jCreditTax">0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="tab-panel" id="panel-history" style="display:none">
+              <p style="color: var(--color-text-secondary); padding: 10px;">سجل التعديلات...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ===== شريط المهام السفلي ===== -->
+  <div class="taskbar">
+    <div class="taskbar-item active" id="taskbar-win-1" onclick="activateWindow( win-1 )">
+      📄 فاتورة مبيعات #INV-2024-001
+    </div>
+    <div class="taskbar-spacer"></div>
+    <div class="taskbar-info">
+      <span id="currentUser">👤 مدير النظام</span>
+      <span id="currentBranch">🏥 الفرع الرئيسي</span>
+      <span id="currentTime"></span>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
