@@ -55,6 +55,12 @@
         <template #dashboard>
           <DashboardScreen />
         </template>
+        <template #invoices>
+          <InvoicesScreen />
+        </template>
+        <template #prescriptions>
+          <PrescriptionsScreen />
+        </template>
         <template #generic="{ window: win }">
           <PlaceholderScreen :title="win.title" :description="pageDescription(win.type)" />
         </template>
@@ -83,6 +89,8 @@ import ItemsScreen from './components/screens/ItemsScreen.vue'
 import CustomersScreen from './components/screens/CustomersScreen.vue'
 import DoctorsScreen from './components/screens/DoctorsScreen.vue'
 import DashboardScreen from './components/screens/DashboardScreen.vue'
+import InvoicesScreen from './components/screens/InvoicesScreen.vue'
+import PrescriptionsScreen from './components/screens/PrescriptionsScreen.vue'
 import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
 
 // ---- الحالة ----
@@ -110,8 +118,8 @@ const pageWindowTypes = {
   doctors: { type: 'doctors', title: 'الأطباء' },
   items: { type: 'items', title: 'الأصناف - الأدوية والمستلزمات' },
   dashboard: { type: 'dashboard', title: 'لوحة التحكم' },
-  invoices: { type: 'sales-invoice', title: 'فواتير المبيعات' },
-  prescriptions: { type: 'generic', title: 'الوصفات الطبية' },
+  invoices: { type: 'invoices', title: 'فواتير المبيعات' },
+  prescriptions: { type: 'prescriptions', title: 'الوصفات الطبية' },
   returns: { type: 'generic', title: 'مرتجعات المبيعات' },
   collections: { type: 'generic', title: 'التحصيل' },
   suppliers: { type: 'generic', title: 'الموردون' },
@@ -193,7 +201,7 @@ function selectPage(page) {
     return
   }
   const newId = 'win-' + Date.now()
-  openWindows.value.push({
+  const newWin = {
     id: newId,
     title: mapping.title,
     type: mapping.type,
@@ -201,7 +209,8 @@ function selectPage(page) {
     status: 'draft',
     minimized: false,
     maximized: false,
-  })
+  }
+  openWindows.value.push(newWin)
   activeWindowId.value = newId
 }
 
