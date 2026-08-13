@@ -320,6 +320,7 @@ const treeByMenu = {
       key: 'security',
       title: 'المستخدمون والتشغيل',
       children: [
+        { page: 'settings', label: 'إعدادات النظام' },
         { page: 'users', label: 'المستخدمون والصلاحيات (RBAC)' },
         { page: 'employees', label: 'الموظفون والورديات' },
         { page: 'audit', label: 'سجل العمليات (Audit Log)' },

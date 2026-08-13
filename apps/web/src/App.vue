@@ -100,9 +100,11 @@
         <template #users>
           <UsersScreen />
         </template>
+        <template #settings>
+          <SettingsScreen />
+        </template>
         <template #generic="{ window: win }">
-          <PlaceholderScreen v-if="win.type !== 'settings'" :title="win.title" :description="pageDescription(win.type)" />
-          <SettingsScreen v-else />
+          <PlaceholderScreen :title="win.title" :description="pageDescription(win.type)" />
         </template>
       </Workspace>
     </div>
@@ -194,7 +196,7 @@ const pageWindowTypes = {
   'reports-insurance': { type: 'generic', title: 'تقارير التأمين' },
   users: { type: 'users', title: 'المستخدمون والأدوار' },
   branches: { type: 'generic', title: 'الفروع' },
-  settings: { type: 'generic', title: 'إعدادات النظام' },
+  settings: { type: 'settings', title: 'إعدادات النظام' },
   audit: { type: 'reports', title: 'سجل العمليات (Audit Log)' },
   'aging-customers': { type: 'collections', title: 'أعمار الديون (عملاء / تأمين)' },
   'aging-suppliers': { type: 'supplier-payments', title: 'أعمار الديون (موردون)' },
@@ -376,7 +378,7 @@ const pageDescriptions = {
 
 const NOT_IMPLEMENTED = new Set([
   'insurance-companies','insurance-cards','insurance-claims','warehouses','stocktake',
-  'branches','settings','notifications','stats','currencies','taxes',
+  'branches','notifications','stats','currencies','taxes',
   'fiscal-years','payment-methods','cheques','bank-reconciliation','custom-reports',
   'employees','backup','system-monitor','about','drug-database',
 ])
