@@ -66,10 +66,26 @@ export async function serverPostTransfer({ fromStoreId, toStoreId, itemId, batch
 
 /* ---------- إلغاء المعاملات (عكس الحركات والقيود) ---------- */
 export async function serverCancelPurchase(id) { await apiFetch('/purchases/' + id + '/cancel', { method: 'POST' }) }
+
+/* ---------- دورة حياة فواتير الشراء: مسودة ← استلام ← ترحيل ← إلغاء استلام ---------- */
+export async function serverCreatePurchaseDraft({ supplierId, date, lines, paymentType, notes }) {
+  return await apiFetch('/purchases/draft', {
+    method: 'POST',
+    body: JSON.stringify({
+      supplierId, invoiceDate: date || today(), paymentType: paymentType || 'credit',
+      notes: notes || null,
+      lines: lines.map(l => ({ itemId: l.itemId, qty: Number(l.qty), unitCost: Number(l.cost ?? l.unitCost ?? 0), discount: 0, tax: 0, subtotal: Number(l.qty) * Number(l.cost ?? l.unitCost ?? 0), expiryDate: l.expDate || l.expiryDate || null })),
+    }),
+  })
+}
+export async function serverReceivePurchase(id) { return await apiFetch('/purchases/' + id + '/receive', { method: 'POST' }) }
+export async function serverPostPurchaseInvoice(id) { return await apiFetch('/purchases/' + id + '/post', { method: 'POST' }) }
+export async function serverUnreceivePurchase(id) { return await apiFetch('/purchases/' + id + '/unreceive', { method: 'POST' }) }
 export async function serverCancelSale(id) { await apiFetch('/sales/' + id + '/cancel', { method: 'POST' }) }
 
 export default {
   serverPostPurchase, serverPostSale, serverPostCollection,
   serverPostSupplierPayment, serverPostReturn, serverPostTransfer,
   serverCancelPurchase, serverCancelSale,
+  serverCreatePurchaseDraft, serverReceivePurchase, serverPostPurchaseInvoice, serverUnreceivePurchase,
 }
