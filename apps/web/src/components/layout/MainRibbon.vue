@@ -36,21 +36,29 @@ defineProps({
 
 defineEmits(['menu-change'])
 
-// قائمة التبويبات الرئيسية — ترتب حسب التسلسل المنطقي في النظام
+// قائمة التبويبات الرئيسية — العنصر الأساسي للتنقل بين وحدات النظام
 const menus = [
-  { value: 'dashboard',  label: 'لوحة التحكم', icon: '📊' },
-  { value: 'sales',      label: 'المبيعات',   icon: '🛒' },
-  { value: 'purchases',  label: 'المشتريات',  icon: '📦' },
-  { value: 'inventory',  label: 'المخزون',    icon: '🏷️' },
-  { value: 'insurance',  label: 'التأمين',    icon: '🏥' },
-  { value: 'accounting', label: 'الحسابات',   icon: '💰' },
-  { value: 'reports',    label: 'التقارير',   icon: '📈' },
-  { value: 'admin',      label: 'الإدارة',    icon: '⚙️' },
+  { value: 'dashboard',  label: 'النظام',          icon: '📊' },
+  { value: 'masterdata', label: 'البيانات الأساسية', icon: '🗃️' },
+  { value: 'sales',      label: 'المبيعات',        icon: '🛒' },
+  { value: 'purchases',  label: 'المشتريات',       icon: '📦' },
+  { value: 'inventory',  label: 'المخزون',         icon: '🏷️' },
+  { value: 'insurance',  label: 'التأمين الصحي',   icon: '🏥' },
+  { value: 'treasury',   label: 'الصندوق والبنوك', icon: '🏦' },
+  { value: 'accounting', label: 'الحسابات',        icon: '💰' },
+  { value: 'profit',     label: 'الربحية والتكاليف', icon: '📉' },
+  { value: 'reports',    label: 'التقارير',        icon: '📈' },
+  { value: 'admin',      label: 'الإدارة',         icon: '⚙️' },
+  { value: 'help',       label: 'المساعدة',        icon: '❓' },
 ]
 </script>
 
 <style scoped>
 .menu-icon {
   margin-left: 4px;
+}
+
+.menu-item {
+  white-space: nowrap;
 }
 </style>
