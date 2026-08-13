@@ -53,9 +53,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db, activeSuppliers } from '../../db/database.js'
+import { db, activeSuppliers, getStorageMode } from '../../db/database.js'
 import { fmt, accountBalance, postSupplierPaymentJournal } from '../../db/engine.js'
 import { requirePermission } from '../../db/session.js'
+import { serverPostSupplierPayment } from '../../db/serverOps.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
+const serverSupplierBals = ref({})
 
 const payments = ref([])
 const suppliers = ref([])
@@ -69,7 +74,7 @@ const sorted = computed(() => [...payments.value].sort((a, b) => b.id - a.id))
 function supplierName(id) { return suppliers.value.find(s => s.id === id)?.name || '—' }
 function methodLabel(m) { return m === 'bank' ? 'تحويل بنكي' : 'نقدي' }
 async function supplierBalance(id) {
-  // ذمم المورد = فواتير الشراء الآجلة − سداداته
+  if (isServer()) return serverSupplierBals.value[id] || 0
   const invoices = await db.purchaseInvoices.where('supplierId').equals(id).and(i => i.paymentType === 'credit').toArray()
   const paid = payments.value.filter(p => p.supplierId === id).reduce((s, p) => s + (p.amount || 0), 0)
   const total = invoices.reduce((s, i) => s + (i.total || 0), 0)
@@ -78,6 +83,21 @@ async function supplierBalance(id) {
 
 async function loadData() {
   suppliers.value = await activeSuppliers()
+  if (isServer()) {
+    try {
+      const p = await apiFetch('/supplier-payments', { fallback: [] })
+      payments.value = Array.isArray(p) ? p : []
+      serverSupplierBals.value = {}
+      for (const s of suppliers.value) {
+        try {
+          const bal = await apiFetch('/suppliers/' + s.id + '/balance')
+          serverSupplierBals.value[s.id] = bal?.balance || 0
+        } catch { serverSupplierBals.value[s.id] = 0 }
+      }
+      payablesId.value = suppliers.value[0]?.id || null
+      return
+    } catch (e) { formError.value = 'فشل تحميل البيانات: ' + (e.message || e); return }
+  }
   payments.value = await db.supplierPayments.toArray()
   const acc = await db.chartOfAccounts.where('code').equals('2-1').first()
   payablesId.value = acc?.id || null
@@ -94,6 +114,15 @@ async function save() {
   formError.value = ''
   try {
     await requirePermission('supplier-payments', 'سداد لمورد')
+    if (isServer()) {
+      const f = form.value
+      if (!f.supplierId) throw new Error('اختر موردًا')
+      if (!f.amount || f.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')
+      await serverPostSupplierPayment({ supplierId: f.supplierId, amount: f.amount, method: f.method, date: f.date, notes: f.notes })
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = form.value
     if (!f.supplierId) throw new Error('اختر موردًا')
     if (!f.amount || f.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')

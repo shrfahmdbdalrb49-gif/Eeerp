@@ -122,9 +122,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db, activeItems } from '../../db/database.js'
+import { db, activeItems, getStorageMode } from '../../db/database.js'
 import { itemStock, consumeStock, addBatch } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { serverPostTransfer } from '../../db/serverOps.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const STORE_LABEL = { 1: 'المخزن الرئيسي', 2: 'مخزن الفرع' }
 
@@ -153,6 +157,20 @@ const filteredItems = computed(() => {
 })
 
 async function loadStocks() {
+  if (isServer()) {
+    try {
+      const batches = await apiFetch('/batches', { fallback: [] })
+      const map = {}
+      for (const it of allItems.value) {
+        const total = (Array.isArray(batches) ? batches : []).filter(b => b.item_id === it.id && b.qty > 0).reduce((s, b) => s + b.qty, 0)
+        map[it.id] = total
+      }
+      stockByItem.value = map
+      return
+    } catch {
+      /* fallback إلى المحرك المحلي */
+    }
+  }
   const map = {}
   for (const it of allItems.value) {
     const s = await itemStock(it.id)
@@ -174,6 +192,22 @@ async function postTransfer() {
   transferError.value = ''
   try {
     await requirePermission('transfers', 'ترحيل تحويل')
+    if (isServer()) {
+      if (lines.value.length === 0) throw new Error('أضف صنفًا واحدًا على الأقل')
+      if (fromStore.value === toStore.value) throw new Error('يجب أن يختلف المخزن المستلم عن المصدر')
+      for (const l of lines.value) {
+        if (!l.qty || l.qty <= 0) throw new Error('كمية غير صحيحة للصنف: ' + l.name)
+        if (l.qty > (stockByItem.value[l.itemId] || 0)) throw new Error('الكمية المحوَّلة من "' + l.name + '" أكبر من المخزون المتاح بالمصدر')
+      }
+      for (const l of lines.value) {
+        await serverPostTransfer({ fromStoreId: fromStore.value, toStoreId: toStore.value, date: transferDate.value, itemId: l.itemId, qty: l.qty })
+      }
+      lines.value = []
+      itemQuery.value = ''
+      await refreshAll()
+      tab.value = 'list'
+      return
+    }
     if (lines.value.length === 0) throw new Error('أضف صنفًا واحدًا على الأقل')
     if (fromStore.value === toStore.value) throw new Error('يجب أن يختلف المخزن المستلم عن المصدر')
     for (const l of lines.value) {
@@ -221,6 +255,18 @@ async function postTransfer() {
 }
 
 async function refreshAll() {
+  if (isServer()) {
+    try {
+      const raw = await apiFetch('/transfers', { fallback: [] })
+      transfers.value = (Array.isArray(raw) ? raw : []).map(t => ({
+        ...t, id: t.id, fromLabel: STORE_LABEL[t.from_store_id || t.fromStoreId] || (t.from_store_id || t.fromStoreId),
+        toLabel: STORE_LABEL[t.to_store_id || t.toStoreId] || (t.to_store_id || t.toStoreId),
+      }))
+      allItems.value = await activeItems()
+      await loadStocks()
+      return
+    } catch (e) { transferError.value = 'فشل تحميل التحويلات: ' + (e.message || e); return }
+  }
   transfers.value = (await db.transfers.toArray()).map(t => ({
     ...t, fromLabel: STORE_LABEL[t.fromStoreId] || t.fromStoreId,
     toLabel: STORE_LABEL[t.toStoreId] || t.toStoreId,

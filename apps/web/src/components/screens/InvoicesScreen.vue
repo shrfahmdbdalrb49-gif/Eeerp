@@ -34,8 +34,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db } from '../../db/database.js'
+import { db, getStorageMode } from '../../db/database.js'
 import { fmt } from '../../db/engine.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const invoices = ref([])
 const customers = ref([])
@@ -54,6 +57,26 @@ const totalSum = computed(() => filtered.value.reduce((s, i) => s + (i.total || 
 function payLabel(t) { return { cash: 'نقدي', bank: 'بنكي', credit: 'آجل' }[t] || t }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      invoices.value = (await apiFetch('/sales')).map(inv => ({
+        ...inv, id: inv.id, customerId: inv.customer_id,
+        paymentType: inv.payment_type || inv.paymentType,
+        total: inv.total,
+        invoiceNo: inv.invoice_no || inv.invoiceNo,
+      }))
+      customers.value = (await apiFetch('/customers', { fallback: [] }))
+      for (const inv of invoices.value) {
+        const c = inv.customerId ? customers.value.find(x => x.id === inv.customerId) : null
+        inv.customerName = c ? c.name : null
+      }
+      return
+    } catch {
+      invoices.value = []
+      customers.value = []
+      return
+    }
+  }
   invoices.value = await db.salesInvoices.toArray()
   customers.value = await db.customers.toArray()
   for (const inv of invoices.value) {

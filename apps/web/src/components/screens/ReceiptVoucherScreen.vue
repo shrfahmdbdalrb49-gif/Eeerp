@@ -56,9 +56,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db, activeCustomers } from '../../db/database.js'
+import { db, activeCustomers, getStorageMode } from '../../db/database.js'
 import { fmt, postCollectionJournal } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { serverPostCollection } from '../../db/serverOps.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
+const serverBalances = ref({})
 
 const collections = ref([])
 const customers = ref([])
@@ -71,12 +76,32 @@ const sorted = computed(() => [...collections.value].sort((a, b) => b.id - a.id)
 const debtors = computed(() => customers.value.filter(c => (c.balance || 0) > 0).sort((a, b) => b.balance - a.balance))
 
 async function customerDebt(c) {
+  if (isServer()) {
+    const bal = serverBalances.value[c.id]
+    return { ...c, creditSales: bal?.creditSales || 0, collected: bal?.collected || 0, balance: bal?.balance || 0 }
+  }
   const creditSales = (await db.salesInvoices.where('customerId').equals(c.id).and(i => i.paymentType === 'credit').toArray()).reduce((s, i) => s + (i.total || 0), 0)
   const collected = collections.value.filter(x => x.customerId === c.id).reduce((s, x) => s + (x.amount || 0), 0)
   return { ...c, creditSales, collected, balance: creditSales - collected }
 }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await activeCustomers()
+      const cols = await apiFetch('/collections', { fallback: [] })
+      collections.value = Array.isArray(cols) ? cols : []
+      serverBalances.value = {}
+      for (const c of raw) {
+        try {
+          const bal = await apiFetch('/customers/' + c.id + '/balance')
+          serverBalances.value[c.id] = { creditSales: bal?.balance || 0, collected: 0, balance: bal?.balance || 0 }
+        } catch { serverBalances.value[c.id] = { creditSales: 0, collected: 0, balance: 0 } }
+      }
+      customers.value = await Promise.all(raw.map(customerDebt))
+      return
+    } catch (e) { formError.value = 'فشل تحميل البيانات: ' + (e.message || e); return }
+  }
   collections.value = await db.collections.toArray()
   const raw = await activeCustomers()
   customers.value = await Promise.all(raw.map(customerDebt))
@@ -93,6 +118,18 @@ async function save() {
   formError.value = ''
   try {
     await requirePermission('receipts', 'ترحيل سند قبض')
+    if (isServer()) {
+      const f = form.value
+      if (!f.customerId) throw new Error('اختر عميلًا')
+      if (!f.amount || f.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')
+      const debtor = debtors.value.find(c => c.id === f.customerId)
+      if (!debtor) throw new Error('العميل لا يملك ذمم مستحقة')
+      if (f.amount > debtor.balance + 0.005) throw new Error(`المبلغ أكبر من ذمم العميل (${fmt(debtor.balance)})`)
+      await serverPostCollection({ customerId: f.customerId, amount: f.amount, method: f.method, date: f.date, notes: f.notes })
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = form.value
     if (!f.customerId) throw new Error('اختر عميلًا')
     if (!f.amount || f.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')

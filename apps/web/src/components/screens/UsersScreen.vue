@@ -64,8 +64,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { db, hashPassword, audit } from '../../db/database.js'
+import { db, hashPassword, audit, getStorageMode } from '../../db/database.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const ROLES = [{ id: 1, name: 'مدير النظام', value: 'admin' }, { id: 2, name: 'محاسب/كاشير', value: 'cashier' }]
 const randSalt = () => 'salt-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -78,6 +81,17 @@ const formError = ref('')
 const form = ref({ userName: '', fullName: '', password: '', role: 'cashier' })
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await apiFetch('/users')
+      users.value = (Array.isArray(raw) ? raw : []).map(u => ({
+        ...u, id: u.id, username: u.username, fullName: u.full_name || u.fullName,
+        role: u.role, active: u.active !== false,
+        roleName: ROLES.find(r => r.value === u.role)?.name || '—', roleKey: u.role,
+      }))
+      return
+    } catch (e) { formError.value = 'فشل تحميل المستخدمين: ' + (e.message || e); return }
+  }
   users.value = await db.users.toArray()
   for (const u of users.value) {
     const r = ROLES.find(r => r.value === u.role)
@@ -100,6 +114,22 @@ async function saveUser() {
   formError.value = ''
   try {
     await requirePermission('users.write', 'إضافة/تعديل مستخدم')
+    if (isServer()) {
+      const f = { ...form.value }
+      if (!f.userName.trim()) throw new Error('أدخل اسم المستخدم')
+      const body = { username: f.userName.trim().toLowerCase(), fullName: f.fullName || f.userName.trim(), role: f.role }
+      if (!editing.value) {
+        if (!f.password) throw new Error('أدخل كلمة مرور')
+        body.password = f.password
+        await apiFetch('/users', { method: 'POST', body: JSON.stringify(body) })
+      } else {
+        if (f.password) body.password = f.password
+        await apiFetch('/users/' + editing.value, { method: 'PUT', body: JSON.stringify(body) })
+      }
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = { ...form.value }
     if (!f.userName.trim()) throw new Error('أدخل اسم المستخدم')
     if (editing.value) {
@@ -133,6 +163,11 @@ async function saveUser() {
 
 async function toggleActive(u) {
   if (u.id === 1) return
+  if (isServer()) {
+    await apiFetch('/users/' + u.id, { method: 'PUT', body: JSON.stringify({ active: !u.active }) })
+    await loadData()
+    return
+  }
   await db.users.update(u.id, { active: !u.active })
   await audit('user_toggled', 'user', u.id, `${u.username} ${u.active ? 'تعطيل' : 'تفعيل'}`)
   await loadData()

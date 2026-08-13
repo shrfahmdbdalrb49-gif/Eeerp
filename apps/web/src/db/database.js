@@ -4,9 +4,15 @@
    لا Mock Data، لا بيانات ثابتة.
    ============================================ */
 import Dexie from 'dexie'
+import { getStorageMode } from './storage.js'
+import { createTables } from './remoteTables.js'
 
-const db = new Dexie('SharafERP')
+export { getStorageMode }
 
+const db = getStorageMode() === 'server' ? createTables() : new Dexie('SharafERP')
+
+/* تعريف الجداول المحلية (IndexedDB) فقط في الوضع المحلي */
+if (getStorageMode() !== 'server') {
 db.version(1).stores({
   // المستخدمون والأدوار (RBAC)
   users: '++id, username, role, active',
@@ -52,6 +58,7 @@ db.version(2).stores({
   prescriptions: '++id, patientId, doctorId, date, status',
   prescriptionLines: '++id, prescriptionId, itemId',
 })
+}
 
 /* ---------- أنواع الحسابات وفق النظام القياسي ----------
    Assets    = أصول
@@ -86,6 +93,8 @@ export async function audit(action, refKind, refId, detail) {
 
 /* ---------- تهيئة النظام الافتراضية (مستخدم إداري + دليل حسابات قياسي) ---------- */
 export async function initSystem() {
+  /* في وضع الخادم المركزي: المستخدمون ودليل الحسابات على الخادم — لا تهيئة محلية */
+  if (getStorageMode() === 'server') return
   const usersCount = await db.users.count()
   const accountsCount = await db.chartOfAccounts.count()
   if (usersCount === 0) {

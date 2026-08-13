@@ -3,8 +3,12 @@
    الصلاحيات تُفرض في منطق البيانات وليس الواجهة فقط.
    ============================================ */
 import { db, audit, hashPassword } from './database.js'
+import { serverLogin, serverLogout, serverSession, getToken } from './api.js'
+import { getStorageMode } from './storage.js'
 
 const SESSION_KEY = 'sharaf-erp-session'
+
+function isServer() { return getStorageMode() === 'server' }
 const ALL_PERMISSIONS = [
   'pos', 'pos.sale', 'pos.return',
   'customers', 'customers.read', 'customers.write',
@@ -21,6 +25,15 @@ const ALL_PERMISSIONS = [
 
 /* تسجيل الدخول — يتحقق فعليًا من hash كلمة المرور */
 export async function login(username, password) {
+  /* في وضع الخادم المركزي: التحقق عبر JWT من الخادم */
+  if (isServer()) {
+    try {
+      const r = await serverLogin(username, password)
+      return { ok: true, user: r.user }
+    } catch (e) {
+      return { ok: false, error: e.message || 'خطأ في المصادقة' }
+    }
+  }
   const user = await db.users
     .where('username')
     .equals((username || '').trim().toLowerCase())
@@ -40,6 +53,7 @@ export async function login(username, password) {
 
 /* حالة الجلسة الحالية */
 export async function currentSession() {
+  if (isServer()) return serverSession()
   const s = await db.settings.get('currentSession')
   if (!s) return null
   const user = await db.users.get(s.userId)
@@ -49,6 +63,10 @@ export async function currentSession() {
 
 /* تسجيل الخروج */
 export async function logout() {
+  if (isServer()) {
+    serverLogout()
+    return
+  }
   const s = await currentSession()
   if (s) await audit('logout', 'auth', s.userId)
   await db.settings.delete('currentSession')
@@ -63,6 +81,8 @@ export async function logout() {
 export async function requirePermission(permission, actionName) {
   const session = await currentSession()
   if (!session) throw new Error('غير مسجَّل الدخول')
+  /* في وضع الخادم المركزي: فرض الصلاحيات يتم على الخادم نفسه (RBAC حقيقي) */
+  if (isServer()) return session
   if (session.role === 'admin') return session
   if (permission === '*' || permission === 'system') throw new Error(`الصلاحية "${permission}" للمدير فقط`)
   const row = await db.rolePermissions

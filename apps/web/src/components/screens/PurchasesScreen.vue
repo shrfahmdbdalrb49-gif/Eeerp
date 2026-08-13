@@ -101,6 +101,9 @@ import { ref, computed, onMounted } from 'vue'
 import { db, activeItems, activeSuppliers } from '../../db/database.js'
 import { fmt, addBatch, postPurchaseJournal } from '../../db/engine.js'
 import { requirePermission } from '../../db/session.js'
+import { apiFetch } from '../../db/api.js'
+import { serverPostPurchase, serverCancelPurchase } from '../../db/serverOps.js'
+import { getStorageMode } from '../../db/database.js'
 
 const invoices = ref([])
 const suppliers = ref([])
@@ -115,7 +118,32 @@ const sortedInvoices = computed(() => [...invoices.value].sort((a, b) => b.id - 
 function supplierName(id) { return suppliers.value.find(s => s.id === id)?.name || '—' }
 function payLabel(t) { return { cash: 'نقدي', bank: 'بنكي', credit: 'آجل' }[t] || t }
 
+function isServer() { return getStorageMode() === 'server' }
+
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await apiFetch('/purchases')
+      suppliers.value = await activeSuppliers()
+      items.value = (await activeItems()).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'))
+      const lines = await apiFetch('/purchases-lines', { fallback: [] })
+      invoices.value = (Array.isArray(raw) ? raw : []).map(inv => {
+        const ils = (Array.isArray(lines) ? lines : []).filter(l => l.invoice_id === inv.id)
+        return {
+          ...inv, id: inv.id,
+          linesCount: ils.length,
+          totalQty: ils.reduce((s, l) => s + (l.qty || 0), 0),
+          avgCost: ils.length ? ils.reduce((s, l) => s + (l.unit_cost || 0), 0) / ils.length : 0,
+          total: ils.reduce((s, l) => s + (l.qty || 0) * (l.unit_cost || 0), 0),
+          expDate: ils[0]?.expiry_date || null,
+        }
+      })
+      return
+    } catch (e) {
+      formError.value = 'فشل تحميل الفواتير: ' + (e.message || e)
+      return
+    }
+  }
   suppliers.value = await activeSuppliers()
   items.value = (await activeItems()).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'))
   const raw = await db.purchaseInvoices.toArray()
@@ -144,6 +172,17 @@ async function saveInvoice() {
   formError.value = ''
   try {
     await requirePermission('purchases', 'إنشاء فاتورة شراء')
+    if (isServer()) {
+      const f = form.value
+      if (!f.supplierId) throw new Error('اختر موردًا')
+      if (!f.itemId) throw new Error('اختر صنفًا')
+      if (!f.qty || f.qty <= 0) throw new Error('الكمية غير صحيحة')
+      if (!f.cost || f.cost <= 0) throw new Error('التكلفة غير صحيحة')
+      await serverPostPurchase({ supplierId: f.supplierId, date: f.date, paymentType: f.paymentType, lines: [{ itemId: f.itemId, qty: f.qty, cost: f.cost, batchNo: f.batchNo || '', expDate: f.expDate || null }] })
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = form.value
     if (!f.supplierId) throw new Error('اختر موردًا')
     if (!f.itemId) throw new Error('اختر صنفًا')
@@ -173,6 +212,11 @@ async function saveInvoice() {
 async function deleteInvoice(id) {
   try {
     await requirePermission('purchases', 'حذف فاتورة شراء')
+    if (isServer()) {
+      await serverCancelPurchase(id)
+      await loadData()
+      return
+    }
     const ils = await db.purchaseLines.where('invoiceId').equals(id).toArray()
     for (const l of ils) {
       await db.batches.delete(l.batchId)

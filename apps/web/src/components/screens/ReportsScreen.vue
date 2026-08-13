@@ -111,6 +111,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db, activeAccounts, ACCOUNT_TYPE_LABEL } from '../../db/database.js'
+import { getStorageMode } from '../../db/storage.js'
+import { apiFetch } from '../../db/api.js'
 import { fmt, trialBalance, generalLedger, incomeStatement } from '../../db/engine.js'
 
 const tabs = [
@@ -137,7 +139,10 @@ async function loadAll() {
     is.value = await incomeStatement()
     accounts.value = (await activeAccounts()).sort((a, b) => a.code.localeCompare(b.code, 'ar'))
     if (ledgerAccount.value) ledgerRows.value = await generalLedger(ledgerAccount.value)
-    auditRows.value = (await db.auditLogs.orderBy('id').reverse().limit(200).toArray())
+    let raw = getStorageMode() === 'server'
+      ? (await apiFetch('/audit?limit=200')).map(a => ({ ...a, userName: a.username, createdAt: a.created_at, refKind: a.ref_kind, refId: a.ref_id, detail: a.details }))
+      : (await db.auditLogs.orderBy('id').reverse().limit(200).toArray())
+    auditRows.value = Array.isArray(raw) ? raw : []
   } catch (e) {
     console.error('فشل تحميل التقارير:', e)
     loadError.value = String(e.message || e)

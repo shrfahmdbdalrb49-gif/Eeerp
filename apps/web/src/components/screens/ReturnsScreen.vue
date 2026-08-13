@@ -61,9 +61,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db } from '../../db/database.js'
+import { db, getStorageMode } from '../../db/database.js'
 import { fmt, addBatch, postReturnJournal } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { serverPostReturn } from '../../db/serverOps.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const returns = ref([])
 const salesInvoices = ref([])
@@ -82,6 +86,28 @@ const invoiceItems = computed(() => {
 })
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await apiFetch('/sales-returns', { fallback: [] })
+      returns.value = (Array.isArray(raw) ? raw : []).map(r => ({ ...r, itemName: itemNames.value[r.item_id] || '—' }))
+      const invs = await apiFetch('/sales', { fallback: [] })
+      const linesByInv = {}
+      const lines = await apiFetch('/sales-lines', { fallback: [] })
+      for (const l of (Array.isArray(lines) ? lines : [])) {
+        (linesByInv[l.invoice_id] = linesByInv[l.invoice_id] || []).push(l)
+      }
+      salesInvoices.value = (Array.isArray(invs) ? invs : []).map(inv => ({
+        ...inv, id: inv.id,
+        lines: (linesByInv[inv.id] || []).map(l => ({
+          id: l.item_id,
+          name: itemNames.value[l.item_id] || `صنف #${l.item_id}`,
+          qty: l.qty,
+          soldQty: l.qty,
+        })),
+      }))
+      return
+    } catch (e) { formError.value = 'فشل تحميل البيانات: ' + (e.message || e); return }
+  }
   const raw = await db.salesReturns.toArray()
   returns.value = raw.map(r => ({ ...r, itemName: itemNames.value[r.itemId] || '—' }))
   const linesByInv = {}
@@ -109,6 +135,21 @@ async function save() {
   formError.value = ''
   try {
     const session = await requirePermission('pos.return', 'ترحيل مرتجع بيع')
+    if (isServer()) {
+      const f = form.value
+      if (!f.saleInvoiceId) throw new Error('اختر فاتورة البيع')
+      const inv = salesInvoices.value.find(i => i.id === f.saleInvoiceId)
+      if (!inv) throw new Error('الفاتورة غير موجودة')
+      const line = (inv.lines || []).find(l => l.id === f.itemId)
+      if (!line) throw new Error('الصنف ليس ضمن بنود الفاتورة')
+      if (!f.qty || f.qty <= 0) throw new Error('الكمية غير صحيحة')
+      if (!items.value.find(i => i.id === f.itemId)) throw new Error('الصنف غير موجود')
+      const item = items.value.find(i => i.id === f.itemId)
+      await serverPostReturn({ saleInvoiceId: f.saleInvoiceId, customerId: inv.customerId || null, refundMethod: f.refundMethod, lines: [{ itemId: f.itemId, qty: f.qty, price: Number(item?.sellPrice) || 0 }] })
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = form.value
     if (!f.saleInvoiceId) throw new Error('اختر فاتورة البيع')
     const inv = salesInvoices.value.find(i => i.id === f.saleInvoiceId)

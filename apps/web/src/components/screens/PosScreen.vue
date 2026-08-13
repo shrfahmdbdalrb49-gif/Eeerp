@@ -89,9 +89,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db, activeItems, activeCustomers } from '../../db/database.js'
+import { db, activeItems, activeCustomers, getStorageMode } from '../../db/database.js'
 import { fmt, consumeStock, computeCOGS, postSaleJournal } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { serverPostSale } from '../../db/serverOps.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const query = ref('')
 const items = ref([])
@@ -137,6 +141,14 @@ async function checkout() {
     if (cart.value.length === 0) throw new Error('السلة فارغة')
     const total = cartTotal.value
     if (total <= 0) throw new Error('الإجمالي صفر')
+    /* في وضع الخادم المركزي: النشر دفعة واحدة عبر الخادم (مخزون + قيد مزدوج داخل معاملة واحدة) */
+    if (isServer()) {
+      const res = await serverPostSale({ customerId: customerId.value, paymentType: paymentType.value, lines: cart.value.map(c => ({ itemId: c.itemId, qty: c.qty, price: c.sellPrice })) })
+      cart.value = []
+      checkoutError.value = ''
+      await loadData()
+      return
+    }
     const paid = paymentType.value === 'credit' ? 0 : total
 
     // 1. إنشاء فاتورة البيع
@@ -184,6 +196,18 @@ async function audit(action, refKind, refId, detail) {
 }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await activeItems()
+      const stockRes = await apiFetch('/batches')
+      const batches = Array.isArray(stockRes) ? stockRes : []
+      const stockMap = {}
+      for (const b of batches) if (b.qty > 0) stockMap[b.item_id] = (stockMap[b.item_id] || 0) + b.qty
+      items.value = raw.map(it => ({ ...it, sellPrice: Number(it.sellPrice ?? it.price) || 0, stock: stockMap[it.id] || 0, _stock: stockMap[it.id] || 0 })).sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+      customers.value = await activeCustomers()
+      return
+    } catch (e) { checkoutError.value = 'فشل تحميل البيانات: ' + (e.message || e); return }
+  }
   const raw = await activeItems()
   const batches = await db.batches.toArray()
   const stockMap = {}

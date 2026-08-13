@@ -62,9 +62,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db, ACCOUNT_TYPE_LABEL } from '../../db/database.js'
+import { db, ACCOUNT_TYPE_LABEL, getStorageMode } from '../../db/database.js'
 import { fmt, accountBalance } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const accounts = ref([])
 const balances = ref({})
@@ -79,6 +82,22 @@ function typeLabel(t) { return ACCOUNT_TYPE_LABEL[t] || t }
 const parentOptions = computed(() => accounts.value.filter(a => a.id !== formEditing.value))
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await apiFetch('/accounts')
+      accounts.value = (Array.isArray(raw) ? raw : []).map(a => ({
+        ...a, id: a.id, name: a.name, type: a.account_type || a.type,
+        parentIdRef: a.parent_code || a.parentIdRef || null,
+        code: a.code, number: a.number || Number(a.code), level: a.level || 1,
+        openingDebit: a.opening_debit || 0, openingCredit: a.opening_credit || 0,
+        active: a.status === 'active' || a.active !== false,
+      }))
+      const bal = {}
+      for (const acc of accounts.value) bal[acc.id] = await accountBalance(acc.id)
+      balances.value = bal
+      return
+    } catch (e) { formError.value = 'فشل تحميل الدليل: ' + (e.message || e); return }
+  }
   accounts.value = await db.chartOfAccounts.toArray()
   const bal = {}
   for (const acc of accounts.value) bal[acc.id] = await accountBalance(acc.id)
@@ -105,6 +124,13 @@ function accHasMovements(id) {
 async function deleteAccount(acc) {
   try {
     await requirePermission('accounts.write', 'حذف حساب')
+    if (isServer()) {
+      const movements = await db.journalLines.where('accountId').equals(acc.id).count()
+      if (movements > 0) throw new Error('لا يمكن حذف حساب عليه حركات/قيود')
+      await apiFetch('/accounts/' + acc.id, { method: 'PUT', body: JSON.stringify({ active: false }) })
+      await loadData()
+      return
+    }
     const movements = await db.journalLines.where('accountId').equals(acc.id).count()
     if (movements > 0) throw new Error('لا يمكن حذف حساب عليه حركات/قيود')
     await db.chartOfAccounts.delete(acc.id)
@@ -121,6 +147,31 @@ async function saveAccount() {
   formError.value = ''
   try {
     await requirePermission('accounts.write', 'حفظ حساب')
+    if (isServer()) {
+      const f = form.value
+      if (!f.name) throw new Error('اسم الحساب مطلوب')
+      const parent = f.parentId ? accounts.value.find(a => a.id === f.parentId) : null
+      let code, number, level
+      if (parent) {
+        const existingChildren = accounts.value.filter(a => a.id !== formEditing.value && a.parentIdRef === parent.code).length
+        code = `${parent.code}-${existingChildren + 1}`
+        number = Number(String(parent.number) + (existingChildren + 1))
+        level = (parent.level || 1) + 1
+      } else {
+        const existingRoots = accounts.value.filter(a => a.id !== formEditing.value && (!a.parentIdRef || a.parentIdRef === 'root')).length
+        code = String(existingRoots + 1)
+        number = existingRoots + 1
+        level = 1
+      }
+      if (formEditing.value) {
+        await apiFetch('/accounts/' + formEditing.value, { method: 'PUT', body: JSON.stringify({ name: f.name, accountType: f.type, parentCode: parent?.code || null, code, number, level, openingDebit: f.openingDebit || 0, openingCredit: f.openingCredit || 0 }) })
+      } else {
+        await apiFetch('/accounts', { method: 'POST', body: JSON.stringify({ name: f.name, accountType: f.type, parentCode: parent?.code || null, code, number, level, openingDebit: f.openingDebit || 0, openingCredit: f.openingCredit || 0 }) })
+      }
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = form.value
     if (!f.name) throw new Error('اسم الحساب مطلوب')
     const siblings = accounts.value.filter(a => a.id !== formEditing.value && a.parentIdRef === (f.parentId || 'root'))

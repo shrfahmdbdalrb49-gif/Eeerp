@@ -65,9 +65,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db, activeItems, activeCustomers } from '../../db/database.js'
+import { db, activeItems, activeCustomers, getStorageMode } from '../../db/database.js'
 import { fmt, consumeStock, computeCOGS, postSaleJournal } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
+import { serverPostSale } from '../../db/serverOps.js'
+import { apiFetch } from '../../db/api.js'
+
+function isServer() { return getStorageMode() === 'server' }
 
 const invoices = ref([])
 const customers = ref([])
@@ -81,6 +85,31 @@ const sorted = computed(() => [...invoices.value].sort((a, b) => b.id - a.id))
 function payLabel(t) { return { cash: 'نقدي', bank: 'بنكي', credit: 'آجل' }[t] || t }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const raw = await apiFetch('/sales')
+      const users = await apiFetch('/users')
+      const usersMap = Object.fromEntries((Array.isArray(users) ? users : []).map(u => [u.id, u.full_name || u.fullName]))
+      invoices.value = (Array.isArray(raw) ? raw : []).map(inv => ({
+        ...inv,
+        customerName: inv.customer_id ? (customers.value.find(c => c.id === inv.customer_id)?.name) : null,
+        linesCount: 0,
+        createdByName: usersMap[inv.created_by || inv.createdBy] || '—',
+      }))
+      const lines = await apiFetch('/sales-lines', { fallback: [] })
+      for (const inv of invoices.value) inv.linesCount = (Array.isArray(lines) ? lines : []).filter(l => l.invoice_id === inv.id).length
+      customers.value = await activeCustomers()
+      const b = await apiFetch('/batches')
+      const stockMap = {}
+      for (const x of (Array.isArray(b) ? b : [])) if (x.qty > 0) stockMap[x.item_id] = (stockMap[x.item_id] || 0) + x.qty
+      items.value = (await activeItems())
+        .map(it => ({ ...it, _stock: stockMap[it.id] || 0 }))
+        .filter(it => it._stock > 0)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+      form.value.price = items.value[0]?.sellPrice || 0
+      return
+    } catch (e) { formError.value = 'فشل تحميل البيانات: ' + (e.message || e); return }
+  }
   const raw = await db.salesInvoices.toArray()
   const users = await db.users.toArray()
   const usersMap = Object.fromEntries(users.map(u => [u.id, u.fullName]))
@@ -108,6 +137,21 @@ async function save() {
   formError.value = ''
   try {
     const session = await requirePermission('sales.write', 'إنشاء فاتورة بيع')
+    if (isServer()) {
+      const f = form.value
+      if (!f.itemId) throw new Error('اختر صنفًا')
+      if (!f.qty || f.qty <= 0) throw new Error('الكمية غير صحيحة')
+      const item = items.value.find(i => i.id === f.itemId)
+      if (f.qty > (item?._stock || 0)) throw new Error(`المخزون المتاح أقل من المطلوب (${item?._stock || 0})`)
+      const total = f.qty * (f.price || 0)
+      if (total <= 0) throw new Error('الإجمالي صفر')
+      await serverPostSale({ customerId: f.customerId, paymentType: f.paymentType, lines: [{ itemId: f.itemId, qty: f.qty, price: f.price }] })
+      const s = await currentSession()
+      await db.auditLogs.add({ userId: s?.userId ?? 0, userName: s?.userName ?? 'مجهول', action: 'sale_created', refKind: 'sale', refId: null, detail: null, createdAt: Date.now() })
+      showForm.value = false
+      await loadData()
+      return
+    }
     const f = form.value
     if (!f.itemId) throw new Error('اختر صنفًا')
     if (!f.qty || f.qty <= 0) throw new Error('الكمية غير صحيحة')

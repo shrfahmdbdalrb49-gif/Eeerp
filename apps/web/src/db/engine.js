@@ -4,6 +4,12 @@
    المخزون يُدار بال_batches مع FEFO
    ============================================ */
 import { db, audit, ACCOUNT_TYPE_LABEL, activeAccounts } from './database.js'
+import { getStorageMode } from './storage.js'
+import { apiFetch } from './api.js'
+import * as engineServer from './engineServer.js'
+
+/* حالة وضع الخادم المركزي: المحركات تنفّذ العملية عبر API */
+function isServer() { return getStorageMode() === 'server' }
 
 export function fmt(n) {
   const v = Number(n ?? 0)
@@ -13,6 +19,15 @@ export function fmt(n) {
 
 /* ---------- رصيد الحساب: افتتاحي + مجموع مدين − مجموع دائن (لا NaN) ---------- */
 export async function accountBalance(accountId) {
+  if (isServer()) {
+    try {
+      const acc = await apiFetch('/accounts/' + accountId)
+      return acc && acc.balance ? acc.balance.balance : 0
+    } catch (e) {
+      if (e.status === 404) return 0
+      throw e
+    }
+  }
   const acc = await db.chartOfAccounts.get(accountId)
   if (!acc) return 0
   const lines = await db.journalLines.where('accountId').equals(accountId).toArray()
@@ -26,6 +41,12 @@ export async function accountBalance(accountId) {
 
 /* ---------- ميزان المراجعة ---------- */
 export async function trialBalance() {
+  /* في وضع الخادم المركزي: الحساب من الخادم */
+  if (isServer()) {
+    const data = await apiFetch('/reports/trial-balance')
+    if (data && Array.isArray(data.rows)) return data
+    return data
+  }
   const accounts = await activeAccounts()
   const rows = []
   for (const acc of accounts) {
@@ -45,6 +66,10 @@ export async function trialBalance() {
 
 /* ---------- الأستاذ العام (كل القيود على حساب) ---------- */
 export async function generalLedger(accountId, from, to) {
+  if (isServer()) {
+    const data = await apiFetch('/reports/general-ledger/' + accountId + (from || to ? '?' + new URLSearchParams({ from: from || '', to: to || '' }).toString() : ''))
+    return data && Array.isArray(data) ? data : []
+  }
   const lines = await db.journalLines
     .where('accountId')
     .equals(accountId)
@@ -70,6 +95,14 @@ export async function generalLedger(accountId, from, to) {
 
 /* ---------- قائمة الدخل (إيرادات − مصروفات) ---------- */
 export async function incomeStatement(from, to) {
+  if (isServer()) {
+    const qs = new URLSearchParams()
+    if (from) qs.set('from', from)
+    if (to) qs.set('to', to)
+    const q = qs.toString()
+    const data = await apiFetch('/reports/income-statement' + (q ? '?' + q : ''))
+    return data
+  }
   const all = await activeAccounts()
   const accounts = all.filter(a => a.type === 'Revenue' || a.type === 'Expense')
   const revenues = [], expenses = []
@@ -93,6 +126,21 @@ export async function postJournalEntry({ date, description, refKind, refId, line
     throw new Error(`القيد غير متوازن: مدين ${fmt(debitSum)} / دائن ${fmt(creditSum)}`)
   }
   if (lines.length < 2) throw new Error('القيد يتطلب سطرين على الأقل')
+  /* في وضع الخادم المركزي: النشر يتم على الخادم (transaction كامل) */
+  if (isServer()) {
+    const data = await apiFetch('/journals', {
+      method: 'POST',
+      body: JSON.stringify({
+        date: date || new Date().toISOString().slice(0, 10),
+        description: description || '',
+        refKind: refKind || null,
+        refId: refId || null,
+        lines: lines.map(l => ({ accountId: l.accountId, description: l.description || null, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0 })),
+      }),
+    })
+    await audit('journal_post', 'journal', data.entryId || null, description)
+    return data.entryId
+  }
   for (const l of lines) {
     if (!l.accountId) throw new Error('سطر قيد بدون حساب')
     if ((Number(l.debit) || 0) < 0 || (Number(l.credit) || 0) < 0) throw new Error('قيم سالبة غير مسموحة')
@@ -116,6 +164,14 @@ export async function postJournalEntry({ date, description, refKind, refId, line
 /* ---------- المخزون: إضافة تشغيلة عند الشراء/الفتح ---------- */
 export async function addBatch({ itemId, storeId, batchNo, mfgDate, expDate, qty, cost, sourceKind, sourceId }) {
   if (!qty || qty <= 0) throw new Error('كمية غير صحيحة')
+  /* في وضع الخادم المركزي: التشغيلة تُضاف عبر الشراء أو التحويل على الخادم */
+  if (isServer()) {
+    const b = await apiFetch('/batches', {
+      method: 'POST',
+      body: JSON.stringify({ itemId, storeId: storeId || 1, batchNo: batchNo || '', mfgDate: mfgDate || null, expDate: expDate || null, qty: Number(qty), cost: Number(cost) || 0 }),
+    })
+    return b.id
+  }
   const id = await db.batches.add({
     itemId, storeId: storeId || 1, batchNo: batchNo || '', mfgDate: mfgDate || null,
     expDate: expDate || null, qty: Number(qty), cost: Number(cost) || 0,
@@ -131,6 +187,15 @@ export async function addBatch({ itemId, storeId, batchNo, mfgDate, expDate, qty
 
 /* ---------- قراءة المخزون: إجمالي الكميات لكل صنف (FEFO: الأقدم صالحًا أولًا) ---------- */
 export async function itemStock(itemId, asOf) {
+  if (isServer()) {
+    try {
+      const data = await apiFetch('/items/' + itemId + '/stock')
+      return data
+    } catch (e) {
+      if (e.status === 404) return { batches: [], total: 0, avgCost: 0 }
+      throw e
+    }
+  }
   const batches = await db.batches
     .where('itemId').equals(itemId)
     .and(b => !b.quarantined && b.qty > 0)
@@ -145,6 +210,8 @@ export async function itemStock(itemId, asOf) {
 
 /* ---------- صرف من المخزون (FEFO) — يُستخدم في البيع ---------- */
 export async function consumeStock(itemId, qty) {
+  /* في وضع الخادم المركزي: الخادم ينفذ الصرف تلقائيًا داخل POST /sales — تخطٍّ فقط */
+  if (isServer()) return []
   const { batches } = await itemStock(itemId)
   let remaining = Number(qty)
   const consumed = []
@@ -167,6 +234,18 @@ export async function consumeStock(itemId, qty) {
 
 /* ---------- حساب تكلفة المبيعات لقيود مزدوجة ---------- */
 export async function computeCOGS(itemId, qty) {
+  if (isServer()) {
+    const { batches } = await itemStock(itemId)
+    const sorted = [...batches].sort((a, b) => (a.exp_date || a.expDate || '9999') < (b.exp_date || b.expDate || '9999') ? -1 : 1)
+    let remaining = Number(qty), cogs = 0
+    for (const b of sorted) {
+      if (remaining <= 0) break
+      const take = Math.min(b.qty, remaining)
+      cogs += take * (b.cost || 0)
+      remaining -= take
+    }
+    return { cogs, available: batches.reduce((s, b) => s + b.qty, 0) }
+  }
   const { batches } = await itemStock(itemId)
   const sorted = [...batches].sort((a, b) => (a.expDate || '9999') < (b.expDate || '9999') ? -1 : 1)
   let remaining = Number(qty), cogs = 0
@@ -181,6 +260,16 @@ export async function computeCOGS(itemId, qty) {
 
 /* ---------- حسابات النظام الرئيسية (تُقرأ من الإعدادات) ---------- */
 export async function sysAccounts() {
+  if (isServer()) {
+    const all = await apiFetch('/accounts')
+    const arr = Array.isArray(all) ? all : []
+    const get = code => { const a = arr.find(x => x.code === code); return a ? a.id : null }
+    return {
+      cash: get('1-1-1'), bank: get('1-1-2'), receivables: get('1-2'), inventory: get('1-3'),
+      payables: get('2-1'), equity: get('3-1'), salesRevenue: get('4-1'), salesReturns: get('4-2'),
+      cogs: get('5-1'), operatingExpenses: get('5-2'),
+    }
+  }
   const all = await db.chartOfAccounts.toArray()
   const get = code => { const a = all.find(x => x.code === code); return a ? a.id : null }
   return {
@@ -268,6 +357,13 @@ export async function postOpeningJournal({ date, description, lines }) {
 
 /* ---------- قيد تحويل بين مخازن (لا أثر محاسبي على القيمة، حركة فقط) ---------- */
 export async function recordTransfer({ fromStoreId, toStoreId, itemId, batchId, qty }) {
+  if (isServer()) {
+    await apiFetch('/transfers', {
+      method: 'POST',
+      body: JSON.stringify({ fromStoreId, toStoreId, itemId, batchId, qty }),
+    })
+    return
+  }
   const b = await db.batches.get(batchId)
   if (!b || b.qty < qty) throw new Error('مخزون غير كافٍ للتحويل')
   const newId = await db.batches.add({

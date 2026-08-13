@@ -101,7 +101,8 @@
           <UsersScreen />
         </template>
         <template #generic="{ window: win }">
-          <PlaceholderScreen :title="win.title" :description="pageDescription(win.type)" />
+          <PlaceholderScreen v-if="win.type !== 'settings'" :title="win.title" :description="pageDescription(win.type)" />
+          <SettingsScreen v-else />
         </template>
       </Workspace>
     </div>
@@ -144,6 +145,7 @@ import ReceiptVoucherScreen from './components/screens/ReceiptVoucherScreen.vue'
 import AccountsScreen from './components/screens/AccountsScreen.vue'
 import TransfersScreen from './components/screens/TransfersScreen.vue'
 import UsersScreen from './components/screens/UsersScreen.vue'
+import SettingsScreen from './components/screens/SettingsScreen.vue'
 import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
 
 // ---- الحالة ----
@@ -444,10 +446,24 @@ function handleKeydown(e) {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('sharaf-logout', () => {
+    authenticated.value = false
+    currentUser.value = null
+  })
   // تهيئة قاعدة البيانات (المستخدم الافتراضي + دليل الحسابات) ثم التحقق من الجلسة
-  const { initSystem } = await import('./db/database.js')
+  const { initSystem, getStorageMode } = await import('./db/database.js')
   const { currentSession } = await import('./db/session.js')
-  await initSystem()
+  if (getStorageMode() === 'server') {
+    // في وضع الخادم المركزي: التحقق من الاتصال بالخادم قبل استكمال التحميل
+    const { apiBase } = await import('./db/api.js')
+    let ok = false
+    for (const url of [apiBase() + '/health', apiBase() + '/settings']) {
+      try { const r = await fetch(url, { signal: AbortSignal.timeout(6000) }); ok = r.ok || r.status === 401; if (ok) break } catch {}
+    }
+    if (!ok) console.warn('[SharafERP] الخادم المركزي غير متاح على', apiBase(), '— لن تعمل العمليات حتى يصبح متصلًا')
+  } else {
+    await initSystem()
+  }
   const session = await currentSession()
   authenticated.value = !!session
   currentUser.value = session
