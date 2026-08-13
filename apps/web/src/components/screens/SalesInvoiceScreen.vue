@@ -1,767 +1,166 @@
 <template>
-  <!-- ========== شاشة فاتورة المبيعات ========== -->
-  <div class="window-body flex-col">
-    <!-- رأس الفاتورة -->
-    <div class="invoice-header">
-      <div class="header-block">
-        <div class="block-title">بيانات الوثيقة</div>
-        <div class="field-row">
-          <label>رقم الفاتورة</label>
-          <input type="text" class="input-field" :value="invoiceNumber" readonly />
-        </div>
-        <div class="field-row">
-          <label>التاريخ</label>
-          <input type="date" class="input-field" v-model="invoiceDate" />
-        </div>
-        <div class="field-row">
-          <label>الفرع</label>
-          <select class="input-field" v-model="branch">
-            <option>الفرع الرئيسي - صنعاء</option>
-            <option>فرع عدن</option>
-            <option>فرع تعز</option>
-          </select>
-        </div>
-        <div class="field-row">
-          <label>المخزن</label>
-          <select class="input-field" v-model="warehouse">
-            <option>المخزن الرئيسي</option>
-            <option>مخزن الطوارئ</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="header-block">
-        <div class="block-title">بيانات المريض</div>
-        <div class="field-row">
-          <label>المريض</label>
-          <div class="input-with-search">
-            <input
-              type="text"
-              class="input-field"
-              placeholder="ابحث عن مريض..."
-              v-model="patientName"
-              @focus="$event.target.select()"
-              @input="patientQuery = $event.target.value"
-              @blur="setTimeout(() => (showPatientDropdown = false), 200)"
-            />
-            <button class="search-btn" @click="openLookup('patient')">🔍</button>
-            <div v-if="showPatientDropdown && filteredPatients.length" class="search-dropdown">
-              <div
-                v-for="p in filteredPatients.slice(0, 8)"
-                :key="p.code"
-                class="dropdown-item"
-                @mousedown.prevent="selectPatient(p)"
-              >
-                <span class="drug-name">{{ p.name }}</span>
-                <span class="drug-barcode">{{ p.code }} | {{ p.phone }}</span>
-                <span class="drug-price">{{ fmt(p.balance) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="field-row">
-          <label>رقم الهاتف</label>
-          <input type="text" class="input-field" placeholder="777XXXXXX" v-model="patientPhone" />
-        </div>
-        <div class="field-row">
-          <label>الطبيب</label>
-          <div class="input-with-search">
-            <input
-              type="text"
-              class="input-field"
-              placeholder="اسم الطبيب..."
-              v-model="doctorName"
-              @focus="$event.target.select()"
-              @input="doctorQuery = $event.target.value"
-              @blur="setTimeout(() => (showDoctorDropdown = false), 200)"
-            />
-            <button class="search-btn" @click="openLookup('doctor')">🔍</button>
-            <div v-if="showDoctorDropdown && filteredDoctors.length" class="search-dropdown">
-              <div
-                v-for="d in filteredDoctors.slice(0, 8)"
-                :key="d.code"
-                class="dropdown-item"
-                @mousedown.prevent="selectDoctor(d)"
-              >
-                <span class="drug-name">{{ d.name }}</span>
-                <span class="drug-barcode">{{ d.specialty }} | {{ d.license }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="field-row">
-          <label>رقم الوصفة</label>
-          <input type="text" class="input-field" placeholder="RX-XXXXX" v-model="prescriptionNo" />
-        </div>
-      </div>
-
-      <div class="header-block">
-        <div class="block-title">بيانات البيع</div>
-        <div class="field-row">
-          <label>طريقة الدفع</label>
-          <select class="input-field" v-model="paymentMethod">
-            <option value="cash">نقدي</option>
-            <option value="credit">آجل</option>
-            <option value="insurance">تأمين</option>
-            <option value="card">بطاقة</option>
-          </select>
-        </div>
-        <div class="field-row">
-          <label>نوع السعر</label>
-          <select class="input-field" v-model="priceType">
-            <option>سعر بيع عادي</option>
-            <option>سعر جملة</option>
-            <option>سعر تأمين</option>
-          </select>
-        </div>
-        <div class="field-row">
-          <label>الخصم العام %</label>
-          <input type="number" class="input-field" v-model.number="generalDiscount" min="0" max="100" />
-        </div>
-        <div class="field-row">
-          <label>العملة</label>
-          <select class="input-field" v-model="currency">
-            <option>YER - ريال يمني</option>
-            <option>USD - دولار أمريكي</option>
-            <option>SAR - ريال سعودي</option>
-          </select>
-        </div>
-      </div>
+  <div class="invoice-screen">
+    <div class="screen-toolbar">
+      <button class="btn btn-primary" @click="showForm = true">+ فاتورة بيع جديدة</button>
+      <span class="toolbar-spacer"></span>
+      <span class="toolbar-info">نفس منطق نقطة البيع — خصم FEFO فعلي + قيد مزدوج</span>
     </div>
-
-    <!-- جدول الأصناف -->
-    <div class="table-container flex-1">
+    <div class="table-container table-scroll">
       <table class="dense-table">
         <thead>
           <tr>
-            <th style="width:30px">#</th>
-            <th style="width:170px">الصنف</th>
-            <th style="width:95px">الباركود</th>
-            <th style="width:50px">الوحدة</th>
-            <th style="width:70px">التشغيلة</th>
-            <th style="width:75px">الصلاحية</th>
-            <th style="width:50px">الكمية</th>
-            <th style="width:70px">السعر</th>
-            <th style="width:40px">خصم%</th>
-            <th style="width:40px">ضريبة%</th>
-            <th style="width:80px">الإجمالي</th>
-            <th style="width:28px"></th>
+            <th style="width:45px">#</th><th style="width:100px">التاريخ</th><th>العميل</th><th style="width:120px">البنود</th>
+            <th style="width:100px">الإجمالي</th><th style="width:85px">الدفع</th><th style="width:60px">بواسطة</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in invoiceRows" :key="row.id">
-            <td>{{ i + 1 }}</td>
-            <td>
-              <div class="input-with-search">
-                <input
-                  type="text"
-                  class="table-input drug-search"
-                  placeholder="ابحث عن دواء..."
-                  v-model="row.search"
-                  @focus="$event.target.select()"
-                  @input="filterDrug(row)"
-                  @blur="setTimeout(() => (row.showDropdown = false), 200)"
-                />
-                <div v-if="row.showDropdown && row.filtered.length" class="search-dropdown dropdown-over-table">
-                  <div
-                    v-for="d in row.filtered.slice(0, 8)"
-                    :key="d.code"
-                    class="dropdown-item"
-                    @mousedown.prevent="fillDrug(row, d)"
-                  >
-                    <span class="drug-name">{{ d.name }}</span>
-                    <span class="drug-barcode">{{ d.code }} | {{ d.barcode }}</span>
-                    <span class="drug-price">{{ fmt(d.sellPrice) }}</span>
-                    <span class="drug-stock" :class="{ 'status-low': d.stock <= d.minStock && d.stock > 0, 'status-out': d.stock === 0 }">الرصيد: {{ d.stock }}</span>
-                  </div>
-                  <div v-if="row.filtered.length > 8" class="dropdown-item dropdown-create">
-                    ... و {{ row.filtered.length - 8 }} نتائج أخرى
-                  </div>
-                  <div class="dropdown-item dropdown-create" @mousedown.prevent="openLookup('item', row)">
-                    + إنشاء صنف جديد
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <input
-                type="text"
-                class="table-input barcode-input"
-                placeholder="باركود"
-                v-model="row.barcode"
-                @input="searchByBarcode(row)"
-              />
-            </td>
-            <td><input type="text" class="table-input" value="علبة" readonly /></td>
-            <td><input type="text" class="table-input" placeholder="LOT-001" v-model="row.lot" /></td>
-            <td><input type="date" class="table-input" v-model="row.expiry" /></td>
-            <td><input type="number" class="table-input qty-input" v-model.number="row.qty" min="1" /></td>
-            <td><input type="number" class="table-input price-input" v-model.number="row.price" min="0" /></td>
-            <td><input type="number" class="table-input disc-input" v-model.number="row.disc" min="0" max="100" /></td>
-            <td><input type="number" class="table-input tax-input" v-model.number="row.tax" min="0" max="100" /></td>
-            <td class="row-total">{{ fmt(rowTotal(row)) }}</td>
-            <td><button class="delete-btn" @click="deleteRow(row)">✕</button></td>
+          <tr v-for="inv in sorted" :key="inv.id">
+            <td>{{ inv.id }}</td><td>{{ inv.date }}</td>
+            <td style="font-weight:bold">{{ inv.customerName || 'نقدي' }}</td>
+            <td>{{ inv.linesCount }} بند</td>
+            <td class="num"><b>{{ fmt(inv.total) }}</b></td>
+            <td><span :class="'pay-chip ' + inv.paymentType">{{ payLabel(inv.paymentType) }}</span></td>
+            <td>{{ inv.createdByName || '—' }}</td>
+          </tr>
+          <tr v-if="invoices.length === 0">
+            <td colspan="7" class="empty-state">لا توجد فواتير بيع بعد — أنشئ فاتورة من نقطة البيع أو من هنا</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- شريط الإجماليات -->
-    <div class="totals-bar">
-      <div class="totals-right">
-        <div class="total-item">
-          <span class="total-label">الأصناف:</span>
-          <span class="total-value">{{ invoiceRows.length }}</span>
+    <div v-if="showForm" class="form-modal-overlay" @click.self="showForm = false">
+      <div class="form-modal">
+        <div class="modal-title"><span>فاتورة بيع جديدة</span><button class="close-btn" @click="showForm = false">✕</button></div>
+        <div class="modal-body">
+          <div class="field-row"><label>العميل</label>
+            <select class="input-field" v-model.number="form.customerId">
+              <option :value="null">عميل نقدي (بدون ذمم)</option>
+              <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+          <div class="field-row"><label>الصنف</label>
+            <select class="input-field" v-model.number="form.itemId">
+              <option :value="null" disabled>اختر صنفًا متوفرًا</option>
+              <option v-for="it in items" :key="it.id" :value="it.id">{{ it.name }} — متاح: {{ it._stock }}</option>
+            </select>
+          </div>
+          <div class="field-row"><label>الكمية</label><input type="number" class="input-field" v-model.number="form.qty" min="1" /></div>
+          <div class="field-row"><label>سعر البيع</label><input type="number" class="input-field" v-model.number="form.price" min="0" step="0.01" /></div>
+          <div class="field-row"><label>طريقة الدفع</label>
+            <select class="input-field" v-model="form.paymentType">
+              <option value="cash">نقدي</option><option value="bank">تحويل بنكي</option><option value="credit">آجل</option>
+            </select>
+          </div>
         </div>
-        <div class="total-item">
-          <span class="total-label">الكميات:</span>
-          <span class="total-value">{{ totalQty }}</span>
-        </div>
-      </div>
-      <div class="totals-center">
-        <div class="total-item">
-          <span class="total-label">الإجمالي:</span>
-          <span class="total-value">{{ fmt(Math.round(subtotal)) }}</span>
-        </div>
-        <div class="total-item">
-          <span class="total-label">الخصم:</span>
-          <span class="total-value">{{ fmt(Math.round(totalDiscount)) }}</span>
-        </div>
-        <div class="total-item">
-          <span class="total-label">الضريبة:</span>
-          <span class="total-value">{{ fmt(Math.round(totalTax)) }}</span>
-        </div>
-      </div>
-      <div class="totals-left">
-        <div class="total-item">
-          <span class="total-label">الصافي:</span>
-          <span class="total-net">{{ fmt(Math.round(netTotal)) }}</span>
-        </div>
-        <div class="total-item">
-          <span class="total-label">المدفوع:</span>
-          <input type="number" class="input-field paid-input" v-model.number="paidAmount" min="0" />
-        </div>
-        <div class="total-item">
-          <span class="total-label">المتبقي:</span>
-          <span class="total-value remaining" :style="{ color: remaining > 0 ? 'var(--color-error)' : 'var(--color-success)' }">{{ fmt(Math.round(remaining)) }}</span>
+        <div class="form-actions">
+          <span v-if="formError" class="form-error">{{ formError }}</span>
+          <button class="btn btn-primary" @click="save" :disabled="saving">{{ saving ? 'جارٍ...' : 'ترحيل الفاتورة' }}</button>
+          <button class="btn btn-secondary" @click="showForm = false">إلغاء</button>
         </div>
       </div>
     </div>
-
-    <!-- التبويبات السفلية -->
-    <div class="tabs">
-      <button class="tab" :class="{ active: activeTab === 'details' }" @click="activeTab = 'details'">التفاصيل</button>
-      <button class="tab" :class="{ active: activeTab === 'payments' }" @click="activeTab = 'payments'">الدفعات</button>
-      <button class="tab" :class="{ active: activeTab === 'journal' }" @click="activeTab = 'journal'">القيود المحاسبية</button>
-      <button class="tab" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">سجل التعديلات</button>
-    </div>
-    <div class="tab-content">
-      <div v-show="activeTab === 'details'" class="tab-panel">
-        <p class="panel-hint">تفاصيل إضافية للفاتورة...</p>
-      </div>
-      <div v-show="activeTab === 'payments'" class="tab-panel">
-        <table class="dense-table">
-          <thead>
-            <tr>
-              <th>رقم الدفعة</th>
-              <th>طريقة الدفع</th>
-              <th>المبلغ</th>
-              <th>التاريخ</th>
-              <th>المستلم</th>
-              <th>المرجع</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>نقدي</td>
-              <td>{{ fmt(paidAmount) }}</td>
-              <td>{{ invoiceDate }}</td>
-              <td>مدير النظام</td>
-              <td>—</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-show="activeTab === 'journal'" class="tab-panel">
-        <table class="dense-table">
-          <thead>
-            <tr>
-              <th>الحساب</th>
-              <th>البيان</th>
-              <th>مدين</th>
-              <th>دائن</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>الصندوق</td>
-              <td>مبيعات نقدية</td>
-              <td>{{ fmt(Math.round(netTotal)) }}</td>
-              <td>0</td>
-            </tr>
-            <tr>
-              <td>المبيعات</td>
-              <td>إيراد مبيعات</td>
-              <td>0</td>
-              <td>{{ fmt(Math.round(netTotal - totalTax)) }}</td>
-            </tr>
-            <tr>
-              <td>ضريبة المبيعات</td>
-              <td>ضريبة مستحقة</td>
-              <td>0</td>
-              <td>{{ fmt(Math.round(totalTax)) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-show="activeTab === 'history'" class="tab-panel">
-        <p class="panel-hint">سجل التعديلات...</p>
-      </div>
-    </div>
-
-    <!-- نافذة البحث الموحدة (Lookup Modal) -->
-    <LookupModal
-      v-if="lookupOpen"
-      :type="lookupType"
-      @select="lookupSelect"
-      @close="lookupOpen = false"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { sampleDrugs, patientsDatabase, doctorsDatabase } from '../../data/sampleData.js'
-import LookupModal from './LookupModal.vue'
+import { ref, computed, onMounted } from 'vue'
+import { db, activeItems, activeCustomers } from '../../db/database.js'
+import { fmt, consumeStock, computeCOGS, postSaleJournal } from '../../db/engine.js'
+import { requirePermission, currentSession } from '../../db/session.js'
 
-// ---- حالة الفاتورة ----
-const invoiceNumber = ref('INV-2024-001')
-const invoiceDate = ref('2026-08-13')
-const branch = ref('الفرع الرئيسي - صنعاء')
-const warehouse = ref('المخزن الرئيسي')
-const patientName = ref('')
-const patientPhone = ref('')
-const doctorName = ref('')
-const prescriptionNo = ref('')
-const paymentMethod = ref('cash')
-const priceType = ref('سعر بيع عادي')
-const generalDiscount = ref(0)
-const currency = ref('YER - ريال يمني')
-const paidAmount = ref(0)
-const activeTab = ref('details')
+const invoices = ref([])
+const customers = ref([])
+const items = ref([])
+const showForm = ref(false)
+const saving = ref(false)
+const formError = ref('')
+const form = ref({ customerId: null, itemId: null, qty: 1, price: 0, paymentType: 'cash' })
 
-// ---- البحث المنسدل (المريض/الطبيب) ----
-const patientQuery = ref('')
-const showPatientDropdown = ref(false)
-const doctorQuery = ref('')
-const showDoctorDropdown = ref(false)
+const sorted = computed(() => [...invoices.value].sort((a, b) => b.id - a.id))
+function payLabel(t) { return { cash: 'نقدي', bank: 'بنكي', credit: 'آجل' }[t] || t }
 
-const filteredPatients = computed(() => {
-  const q = patientQuery.value.toLowerCase().trim()
-  if (!q) return []
-  return patientsDatabase.filter(
-    (p) => p.name.toLowerCase().includes(q) || p.phone.includes(q) || p.code.toLowerCase().includes(q)
-  )
-})
-
-const filteredDoctors = computed(() => {
-  const q = doctorQuery.value.toLowerCase().trim()
-  if (!q) return []
-  return doctorsDatabase.filter(
-    (d) => d.name.toLowerCase().includes(q) || d.specialty.toLowerCase().includes(q) || d.phone.includes(q)
-  )
-})
-
-function selectPatient(p) {
-  patientName.value = p.name
-  patientPhone.value = p.phone
-  showPatientDropdown.value = false
+async function loadData() {
+  const raw = await db.salesInvoices.toArray()
+  const users = await db.users.toArray()
+  const usersMap = Object.fromEntries(users.map(u => [u.id, u.fullName]))
+  invoices.value = raw.map(inv => ({
+    ...inv,
+    customerName: inv.customerId ? (customers.value.find(c => c.id === inv.customerId)?.name) : null,
+    linesCount: 0,
+    createdByName: usersMap[inv.createdBy] || '—',
+  }))
+  const lines = await db.salesLines.toArray()
+  for (const inv of invoices.value) inv.linesCount = lines.filter(l => l.invoiceId === inv.id).length
+  customers.value = await activeCustomers()
+  const b = await db.batches.toArray()
+  const stockMap = {}
+  for (const x of b) if (!x.quarantined && x.qty > 0) stockMap[x.itemId] = (stockMap[x.itemId] || 0) + x.qty
+  items.value = (await activeItems())
+    .map(it => ({ ...it, _stock: stockMap[it.id] || 0 }))
+    .filter(it => it._stock > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+  form.value.price = items.value[0]?.sellPrice || 0
 }
 
-function selectDoctor(d) {
-  doctorName.value = d.name
-  showDoctorDropdown.value = false
-}
-
-// ---- صفوف جدول الأصناف ----
-let rowIdSeq = 0
-const invoiceRows = ref([newEmptyRow()])
-
-function newEmptyRow() {
-  return {
-    id: rowIdSeq++,
-    search: '',
-    barcode: '',
-    unit: 'علبة',
-    lot: 'LOT-' + Math.floor(1000 + Math.random() * 9000),
-    expiry: '',
-    qty: 1,
-    price: 0,
-    disc: 0,
-    tax: 0,
-    drug: null,
-    showDropdown: false,
-    filtered: [],
+async function save() {
+  saving.value = true
+  formError.value = ''
+  try {
+    const session = await requirePermission('sales.write', 'إنشاء فاتورة بيع')
+    const f = form.value
+    if (!f.itemId) throw new Error('اختر صنفًا')
+    if (!f.qty || f.qty <= 0) throw new Error('الكمية غير صحيحة')
+    const item = items.value.find(i => i.id === f.itemId)
+    if (f.qty > (item?._stock || 0)) throw new Error(`المخزون المتاح أقل من المطلوب (${item?._stock || 0})`)
+    const total = f.qty * (f.price || 0)
+    if (total <= 0) throw new Error('الإجمالي صفر')
+    const paid = f.paymentType === 'credit' ? 0 : total
+    const saleId = await db.salesInvoices.add({
+      customerId: f.customerId, date: new Date().toISOString().slice(0, 10), storeId: 1,
+      paymentType: f.paymentType, total, status: 'posted', createdBy: session.userId, createdAt: Date.now(),
+    })
+    const { cogs } = await computeCOGS(f.itemId, f.qty)
+    const consumed = await consumeStock(f.itemId, f.qty)
+    await db.salesLines.add({ invoiceId: saleId, itemId: f.itemId, batchIds: consumed.map(c => c.batchId), qty: f.qty, price: f.price, subtotal: total })
+    await postSaleJournal({ saleId, total, paid, customerPaid: f.paymentType, cogsAmount: cogs })
+    const s = await currentSession()
+    await db.auditLogs.add({ userId: s?.userId ?? 0, userName: s?.userName ?? 'مجهول', action: 'sale_created', refKind: 'sale', refId: saleId, detail: null, createdAt: Date.now() })
+    showForm.value = false
+    await loadData()
+  } catch (e) {
+    formError.value = e.message
+  } finally {
+    saving.value = false
   }
 }
 
-function deleteRow(row) {
-  const idx = invoiceRows.value.indexOf(row)
-  if (invoiceRows.value.length > 1) {
-    invoiceRows.value.splice(idx, 1)
-  } else {
-    row.search = ''
-    row.barcode = ''
-    row.lot = 'LOT-' + Math.floor(1000 + Math.random() * 9000)
-    row.expiry = ''
-    row.qty = 1
-    row.price = 0
-    row.disc = 0
-    row.tax = 0
-    row.drug = null
-  }
-}
-
-function filterDrug(row) {
-  const q = row.search.toLowerCase().trim()
-  if (q.length < 1) {
-    row.showDropdown = false
-    row.filtered = []
-    return
-  }
-  row.filtered = sampleDrugs.filter(
-    (d) =>
-      d.name.toLowerCase().includes(q) ||
-      d.scientific.toLowerCase().includes(q) ||
-      d.barcode.includes(q) ||
-      d.code.toLowerCase().includes(q)
-  )
-  row.showDropdown = row.filtered.length > 0
-}
-
-function searchByBarcode(row) {
-  const bc = row.barcode.trim()
-  if (bc.length < 3) return
-  const drug = sampleDrugs.find((d) => d.barcode === bc)
-  if (drug) fillDrug(row, drug)
-}
-
-function fillDrug(row, drug) {
-  row.drug = drug
-  row.search = drug.name
-  row.barcode = drug.barcode
-  row.unit = drug.unit
-  row.lot = 'LOT-' + Math.floor(1000 + Math.random() * 9000)
-  row.expiry = drug.expiry
-  row.price = drug.sellPrice
-  row.showDropdown = false
-}
-
-// ---- الحسابات ----
-function rowTotal(row) {
-  const qty = Number(row.qty) || 0
-  const price = Number(row.price) || 0
-  const disc = Number(row.disc) || 0
-  const tax = Number(row.tax) || 0
-  const sub = qty * price
-  const after = sub - sub * (disc / 100)
-  return after + after * (tax / 100)
-}
-
-const subtotal = computed(() =>
-  invoiceRows.value.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.price) || 0), 0)
-)
-
-const totalDiscount = computed(() => {
-  let lineDisc = invoiceRows.value.reduce((s, r) => {
-    const sub = (Number(r.qty) || 0) * (Number(r.price) || 0)
-    return s + sub * ((Number(r.disc) || 0) / 100)
-  }, 0)
-  const genDisc = (subtotal.value - lineDisc) * ((generalDiscount.value || 0) / 100)
-  return lineDisc + genDisc
-})
-
-const totalTax = computed(() =>
-  invoiceRows.value.reduce((s, r) => {
-    const sub = (Number(r.qty) || 0) * (Number(r.price) || 0)
-    const after = sub - sub * ((Number(r.disc) || 0) / 100)
-    return s + after * ((Number(r.tax) || 0) / 100)
-  }, 0)
-)
-
-const totalQty = computed(() =>
-  invoiceRows.value.reduce((s, r) => s + (Number(r.qty) || 0), 0)
-)
-
-const netTotal = computed(() => subtotal.value - totalDiscount.value + totalTax.value)
-const remaining = computed(() => Math.max(0, netTotal.value - (Number(paidAmount.value) || 0)))
-
-// ---- Lookup Modal ----
-const lookupType = ref('patient')
-const lookupTargetRow = ref(null)
-const lookupOpen = ref(false)
-
-function openLookup(type, row = null) {
-  lookupType.value = type
-  lookupTargetRow.value = row
-  lookupOpen.value = true
-}
-
-function lookupSelect(item) {
-  if (lookupType.value === 'patient') selectPatient(item)
-  else if (lookupType.value === 'doctor') selectDoctor(item)
-  else if (lookupType.value === 'item' && lookupTargetRow.value) fillDrug(lookupTargetRow.value, item)
-  lookupOpen.value = false
-}
-
-// ---- التنسيق ----
-function fmt(n) {
-  return String(n ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
-
-// ---- اختصار Esc لإغلاق المودال ----
-function handleKeydown(e) {
-  if (e.key === 'Escape' && lookupOpen.value) lookupOpen.value = false
-}
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
+onMounted(loadData)
 </script>
 
 <style scoped>
-.window-body.flex-col {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.flex-1 {
-  flex: 1;
-  min-height: 0;
-}
-
-.panel-hint {
-  color: var(--color-text-secondary);
-  padding: var(--space-2);
-  font-size: var(--font-size-sm);
-}
-
-.table-input {
-  width: 100%;
-  height: 24px;
-  border: 1px solid transparent;
-  padding: 0 var(--space-1);
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  background: transparent;
-  text-align: right;
-}
-
-.table-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: white;
-  box-shadow: 0 0 0 1px var(--color-primary);
-}
-
-.row-total {
-  font-weight: bold;
-  text-align: center;
-  color: var(--color-primary);
-}
-
-.delete-btn {
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: var(--color-error);
-  color: white;
-  cursor: pointer;
-  border-radius: var(--border-radius);
-  font-size: 12px;
-}
-
-.delete-btn:hover {
-  background: #d32f2f;
-}
-
-/* قائمة منسدلة داخل جدول */
-.dropdown-over-table {
-  max-width: 360px;
-}
-
-.drug-stock {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-
-.status-low {
-  color: var(--color-warning);
-}
-
-.status-out {
-  color: var(--color-error);
-}
-
-.invoice-header {
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.header-block {
-  flex: 1;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--space-2);
-}
-
-.block-title {
-  font-size: var(--font-size-sm);
-  font-weight: bold;
-  color: var(--color-primary);
-  margin-bottom: var(--space-2);
-  padding-bottom: var(--space-1);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--space-1);
-  gap: var(--space-2);
-}
-
-.field-row label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  min-width: 70px;
-  white-space: nowrap;
-}
-
-.field-row .input-field {
-  flex: 1;
-}
-
-.input-with-search {
-  display: flex;
-  flex: 1;
-  gap: 2px;
-  position: relative;
-}
-
-.search-btn {
-  width: 28px;
-  height: var(--input-height);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  cursor: pointer;
-  border-radius: var(--border-radius);
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.search-btn:hover {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary);
-}
-
-.search-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: white;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--border-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 100;
-  min-width: 300px;
-  max-width: 360px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.dropdown-item {
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--color-bg-secondary);
-  font-size: var(--font-size-base);
-}
-
-.dropdown-item:hover {
-  background: var(--color-primary-light);
-}
-
-.drug-name {
-  font-weight: bold;
-  color: var(--color-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.drug-barcode {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-}
-
-.drug-price {
-  color: var(--color-primary);
-  font-weight: bold;
-}
-
-.dropdown-create {
-  color: var(--color-primary);
-  font-weight: bold;
-  justify-content: center;
-}
-
-.table-container {
-  overflow: auto;
-}
-
-.table-container table {
-  min-width: 720px;
-}
-
-.totals-bar {
-  flex-shrink: 0;
-}
-
-.remaining {
-  color: var(--color-error);
-}
-
-.paid-input {
-  width: 100px !important;
-  text-align: center;
-  font-weight: bold;
-}
-
-.tabs {
-  flex-shrink: 0;
-}
-
-.tab-content {
-  flex-shrink: 0;
-  max-height: 130px;
-  overflow: auto;
-}
-
-.tab-panel {
-  padding: var(--space-2);
-}
-
-.tab-panel table {
-  width: 100%;
-}
+.invoice-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.screen-toolbar { display: flex; gap: 6px; padding: 6px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 2px; margin-bottom: 6px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
+.toolbar-spacer { flex: 1; }
+.toolbar-info { font-size: 12px; color: var(--color-text-secondary); }
+.table-scroll { flex: 1; overflow: auto; background: var(--color-bg-primary); min-height: 0; }
+.empty-state { text-align: center; color: var(--color-text-secondary); padding: 18px; }
+.num { text-align: left; direction: ltr; }
+.pay-chip { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+.pay-chip.cash { background: #e6f4ea; color: #1b5e20; }
+.pay-chip.bank { background: #e3f0ff; color: #0d5aa7; }
+.pay-chip.credit { background: #fff4e0; color: #e65100; }
+.btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px; }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-secondary { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); }
+.form-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.form-modal { background: var(--color-bg-primary); border: 2px solid var(--color-primary); border-radius: 4px; width: 480px; max-width: 94vw; box-shadow: 4px 4px 16px rgba(0,0,0,0.3); }
+.modal-title { display: flex; justify-content: space-between; align-items: center; background: var(--color-primary); color: #fff; font-weight: bold; padding: 6px 12px; }
+.close-btn { background: transparent; border: none; color: #fff; cursor: pointer; }
+.modal-body { padding: 12px; }
+.field-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.field-row label { width: 90px; font-size: 13px; flex-shrink: 0; color: var(--color-text-secondary); }
+.input-field { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 3px; font-size: 13px; background: #fff; flex: 1; }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 12px; background: var(--color-bg-secondary); border-top: 1px solid var(--color-border); }
+.form-error { color: #b71c1c; font-size: 12px; flex: 1; }
 </style>

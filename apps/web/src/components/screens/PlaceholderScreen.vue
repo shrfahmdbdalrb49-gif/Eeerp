@@ -3,11 +3,11 @@
   <div class="placeholder-screen">
     <div class="placeholder-header">
       <h2 class="placeholder-title">{{ title }}</h2>
-      <span class="badge badge-posted">قيد التنفيذ</span>
+      <span class="badge badge-draft">غير منفذة فعليًا</span>
     </div>
     <div class="placeholder-body">
       <p>{{ description }}</p>
-      <p class="hint">سيتم ربط هذه الشاشة بقاعدة البيانات الفعلية بعد اكتمال مرحلة التطوير الأساسية.</p>
+      <p class="hint">⚠️ هذه الميزة غير منفذة فعليًا — لا تُظهر بيانات حقيقية ولا تحفظ أي شيء.</p>
     </div>
   </div>
 </template>

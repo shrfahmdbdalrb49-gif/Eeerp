@@ -1,138 +1,53 @@
 <template>
-  <!-- ========== شاشة سندات الصندوق (قبض/صرف) ========== -->
-  <div class="window-body flex-col">
-    <div class="screen-layout">
-      <div class="screen-sidebar">
-        <button :class="['screen-tab', { active: tab === 'receipt' }]" @click="tab = 'receipt'">📥 سند قبض</button>
-        <button :class="['screen-tab', { active: tab === 'payment' }]" @click="tab = 'payment'">📤 سند صرف</button>
-        <button :class="['screen-tab', { active: tab === 'log' }]" @click="tab = 'log'">📋 سجل الحركة</button>
-      </div>
+  <div class="receipt-screen">
+    <div class="screen-toolbar">
+      <button class="btn btn-primary" @click="openNew">+ سند قبض</button>
+      <span class="toolbar-spacer"></span>
+      <span class="toolbar-info">سند قبض حقيقي — قيد مزدوج + يخفض ذمم العميل فعليًا</span>
+    </div>
+    <div class="table-container table-scroll">
+      <table class="dense-table">
+        <thead>
+          <tr><th style="width:45px">#</th><th style="width:100px">التاريخ</th><th>العميل</th><th style="width:115px">المبلغ</th><th style="width:90px">الطريقة</th><th>ملاحظات</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in sorted" :key="c.id">
+            <td>{{ c.id }}</td><td>{{ c.date }}</td>
+            <td style="font-weight:bold">{{ c.customerName || '—' }}</td>
+            <td class="num"><b>{{ fmt(c.amount) }}</b></td>
+            <td>{{ c.method === 'bank' ? 'تحويل بنكي' : 'نقدي' }}</td>
+            <td>{{ c.notes || '—' }}</td>
+          </tr>
+          <tr v-if="collections.length === 0">
+            <td colspan="6" class="empty-state">لا توجد سندات قبض بعد</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-      <div class="screen-content">
-        <!-- سند القبض -->
-        <div v-if="tab === 'receipt'" class="flex-col full-height">
-          <div class="invoice-header">
-            <div class="header-block">
-              <div class="block-title">بيانات السند</div>
-              <div class="field-row"><label>رقم السند</label><input type="text" class="input-field" :value="receiptNo" readonly /></div>
-              <div class="field-row"><label>التاريخ</label><input type="date" class="input-field" v-model="receiptDate" /></div>
-              <div class="field-row"><label>الصندوق</label>
-                <select class="input-field" v-model="receiptBox">
-                  <option>صندوق المبيعات الرئيسي</option>
-                  <option>صندوق الوارد</option>
-                  <option>بنك الكريمي</option>
-                </select>
-              </div>
-            </div>
-            <div class="header-block">
-              <div class="block-title">بيانات التحصيل</div>
-              <div class="field-row"><label>المستلم من</label><input type="text" class="input-field" v-model="receiptFrom" placeholder="اسم العميل / المريض" /></div>
-              <div class="field-row"><label>المبلغ</label><input type="number" class="input-field" v-model.number="receiptAmount" min="0" /></div>
-              <div class="field-row"><label>العملة</label>
-                <select class="input-field" v-model="receiptCurrency">
-                  <option>YER - ريال يمني</option>
-                  <option>USD - دولار أمريكي</option>
-                </select>
-              </div>
-              <div class="field-row"><label>طريقة الدفع</label>
-                <select class="input-field" v-model="receiptMethod">
-                  <option>نقدي</option>
-                  <option>شيك</option>
-                  <option>بطاقة</option>
-                  <option>تحويل</option>
-                </select>
-              </div>
-            </div>
+    <div v-if="showForm" class="form-modal-overlay" @click.self="showForm = false">
+      <div class="form-modal">
+        <div class="modal-title"><span>سند قبض</span><button class="close-btn" @click="showForm = false">✕</button></div>
+        <div class="modal-body">
+          <div class="field-row"><label>العميل</label>
+            <select class="input-field" v-model.number="form.customerId">
+              <option :value="null" disabled>اختر عميلًا عليه ذمم</option>
+              <option v-for="c in debtors" :key="c.id" :value="c.id">{{ c.name }} — عليه {{ fmt(c.balance) }}</option>
+            </select>
           </div>
-          <div class="totals-bar">
-            <div class="total-item"><span class="total-label">رصيد الصندوق الحالي:</span><span class="total-value">2,450,000</span></div>
-            <div class="total-item"><span class="total-label">بعد التحصيل:</span><span class="total-value total-net">{{ fmt(2450000 + receiptAmount) }}</span></div>
+          <div class="field-row"><label>المبلغ *</label><input type="number" class="input-field" v-model.number="form.amount" min="0.01" step="0.01" /></div>
+          <div class="field-row"><label>الطريقة</label>
+            <select class="input-field" v-model="form.method">
+              <option value="cash">نقدي (صندوق)</option><option value="bank">تحويل بنكي</option>
+            </select>
           </div>
-          <div class="form-actions">
-            <button class="btn btn-success" @click="saveReceipt">✅ ترحيل السند</button>
-            <button class="btn btn-secondary" @click="receiptNo = 'RCV-2026-' + String(receiptLog.length + 1).padStart(3, '0'); receiptFrom = ''; receiptAmount = 0">🗑️ تفريغ</button>
-          </div>
+          <div class="field-row"><label>التاريخ</label><input type="date" class="input-field" v-model="form.date" /></div>
+          <div class="field-row"><label>ملاحظات</label><input type="text" class="input-field" v-model="form.notes" /></div>
         </div>
-
-        <!-- سند الصرف -->
-        <div v-if="tab === 'payment'" class="flex-col full-height">
-          <div class="invoice-header">
-            <div class="header-block">
-              <div class="block-title">بيانات السند</div>
-              <div class="field-row"><label>رقم السند</label><input type="text" class="input-field" :value="payNo" readonly /></div>
-              <div class="field-row"><label>التاريخ</label><input type="date" class="input-field" v-model="payDate" /></div>
-              <div class="field-row"><label>الصندوق</label>
-                <select class="input-field" v-model="payBox">
-                  <option>صندوق المبيعات الرئيسي</option>
-                  <option>صندوق الوارد</option>
-                  <option>بنك الكريمي</option>
-                </select>
-              </div>
-            </div>
-            <div class="header-block">
-              <div class="block-title">بيانات الصرف</div>
-              <div class="field-row"><label>صرف إلى</label><input type="text" class="input-field" v-model="payTo" placeholder="اسم المورد / الموظف" /></div>
-              <div class="field-row"><label>المبلغ</label><input type="number" class="input-field" v-model.number="payAmount" min="0" /></div>
-              <div class="field-row"><label>العملة</label>
-                <select class="input-field" v-model="payCurrency">
-                  <option>YER - ريال يمني</option>
-                  <option>USD - دولار أمريكي</option>
-                </select>
-              </div>
-              <div class="field-row"><label>نوع المصروف</label>
-                <select class="input-field" v-model="payType">
-                  <option>مصروفات تشغيلية</option>
-                  <option>رواتب</option>
-                  <option>إيجارات</option>
-                  <option>فواتير (كهرباء/مياه/إنترنت)</option>
-                  <option>أخرى</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="totals-bar">
-            <div class="total-item"><span class="total-label">رصيد الصندوق الحالي:</span><span class="total-value">2,450,000</span></div>
-            <div class="total-item"><span class="total-label">بعد الصرف:</span><span class="total-value total-net" :style="{ color: payAmount > 2450000 ? 'var(--color-error)' : 'var(--color-primary)' }">{{ fmt(2450000 - payAmount) }}</span></div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" @click="savePay">✅ ترحيل السند</button>
-            <button class="btn btn-secondary" @click="payNo = 'PAY-2026-' + String(payLog.length + 1).padStart(3, '0'); payTo = ''; payAmount = 0">🗑️ تفريغ</button>
-          </div>
-        </div>
-
-        <!-- سجل الحركة -->
-        <div v-if="tab === 'log'" class="flex-col full-height">
-          <div class="screen-toolbar">
-            <input type="text" class="input-field" placeholder="بحث في السجل..." v-model="logSearch" style="width:250px" />
-          </div>
-          <div class="table-scroll">
-            <table class="dense-table">
-              <thead>
-                <tr>
-                  <th style="width:30px">#</th>
-                  <th>رقم السند</th>
-                  <th>النوع</th>
-                  <th>التاريخ</th>
-                  <th>الاسم</th>
-                  <th>المبلغ</th>
-                  <th>الصندوق</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(l, i) in filteredLog" :key="l.no">
-                  <td>{{ i + 1 }}</td>
-                  <td><span class="invoice-no">{{ l.no }}</span></td>
-                  <td><span :class="['badge', l.type === 'قبض' ? 'badge-posted' : 'badge-draft']">{{ l.type }}</span></td>
-                  <td>{{ l.date }}</td>
-                  <td>{{ l.person }}</td>
-                  <td :style="{ color: l.type === 'قبض' ? 'var(--color-success)' : 'var(--color-error)' }"><strong>{{ l.type === 'قبض' ? '+' : '-' }}{{ fmt(l.amount) }}</strong></td>
-                  <td>{{ l.box }}</td>
-                  <td><span class="badge badge-posted">مرحّل</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="form-actions">
+          <span v-if="formError" class="form-error">{{ formError }}</span>
+          <button class="btn btn-primary" @click="save" :disabled="saving">{{ saving ? 'جارٍ...' : 'ترحيل السند' }}</button>
+          <button class="btn btn-secondary" @click="showForm = false">إلغاء</button>
         </div>
       </div>
     </div>
@@ -140,175 +55,89 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { db, activeCustomers } from '../../db/database.js'
+import { fmt, postCollectionJournal } from '../../db/engine.js'
+import { requirePermission, currentSession } from '../../db/session.js'
 
-const tab = ref('receipt')
-const logSearch = ref('')
+const collections = ref([])
+const customers = ref([])
+const showForm = ref(false)
+const saving = ref(false)
+const formError = ref('')
+const form = ref({ customerId: null, amount: 0, method: 'cash', date: new Date().toISOString().slice(0, 10), notes: '' })
 
-const receiptNo = ref('RCV-2026-001')
-const receiptDate = ref(new Date().toISOString().slice(0, 10))
-const receiptBox = ref('صندوق المبيعات الرئيسي')
-const receiptFrom = ref('')
-const receiptAmount = ref(0)
-const receiptCurrency = ref('YER - ريال يمني')
-const receiptMethod = ref('نقدي')
+const sorted = computed(() => [...collections.value].sort((a, b) => b.id - a.id))
+const debtors = computed(() => customers.value.filter(c => (c.balance || 0) > 0).sort((a, b) => b.balance - a.balance))
 
-const payNo = ref('PAY-2026-001')
-const payDate = ref(new Date().toISOString().slice(0, 10))
-const payBox = ref('صندوق المبيعات الرئيسي')
-const payTo = ref('')
-const payAmount = ref(0)
-const payCurrency = ref('YER - ريال يمني')
-const payType = ref('مصروفات تشغيلية')
-
-const receiptLog = ref([
-  { no: 'RCV-2026-005', type: 'قبض', date: '2026-08-12', person: 'خالد عمر سعيد', amount: 10000, box: 'صندوق المبيعات الرئيسي' },
-  { no: 'RCV-2026-004', type: 'قبض', date: '2026-08-11', person: 'عائشة يوسف إبراهيم', amount: 5000, box: 'بنك الكريمي' },
-])
-
-const payLog = ref([
-  { no: 'PAY-2026-002', type: 'صرف', date: '2026-08-12', person: 'مؤسسة الشفاء للتوريدات', amount: 50000, box: 'بنك الكريمي' },
-  { no: 'PAY-2026-001', type: 'صرف', date: '2026-08-10', person: 'فواتير الكهرباء', amount: 15000, box: 'صندوق المبيعات الرئيسي' },
-])
-
-const allLog = computed(() =>
-  [...receiptLog.value.map(r => ({ ...r, no: r.no })), ...payLog.value].sort((a, b) => b.date.localeCompare(a.date))
-)
-
-const filteredLog = computed(() =>
-  allLog.value.filter(l => !logSearch.value || l.person.includes(logSearch.value) || l.no.includes(logSearch.value))
-)
-
-function fmt(n) {
-  return Number(n).toLocaleString('en-US')
+async function customerDebt(c) {
+  const creditSales = (await db.salesInvoices.where('customerId').equals(c.id).and(i => i.paymentType === 'credit').toArray()).reduce((s, i) => s + (i.total || 0), 0)
+  const collected = collections.value.filter(x => x.customerId === c.id).reduce((s, x) => s + (x.amount || 0), 0)
+  return { ...c, creditSales, collected, balance: creditSales - collected }
 }
 
-function saveReceipt() {
-  if (!receiptFrom.value || !receiptAmount.value) {
-    alert('⚠️ أدخل اسم المستلم والمبلغ')
-    return
-  }
-  receiptLog.value.unshift({
-    no: receiptNo.value, type: 'قبض', date: receiptDate.value,
-    person: receiptFrom.value, amount: receiptAmount.value, box: receiptBox.value,
-  })
-  alert('✅ تم ترحيل سند القبض: ' + receiptNo.value)
-  receiptNo.value = 'RCV-2026-' + String(receiptLog.value.length + 1).padStart(3, '0')
-  receiptFrom.value = ''
-  receiptAmount.value = 0
-  tab.value = 'log'
+async function loadData() {
+  collections.value = await db.collections.toArray()
+  const raw = await activeCustomers()
+  customers.value = await Promise.all(raw.map(customerDebt))
 }
 
-function savePay() {
-  if (!payTo.value || !payAmount.value) {
-    alert('⚠️ أدخل اسم المستلم والمبلغ')
-    return
-  }
-  if (payAmount.value > 2450000) {
-    if (!confirm('⚠️ المبلغ يتجاوز رصيد الصندوق. المتابعة؟')) return
-  }
-  payLog.value.unshift({
-    no: payNo.value, type: 'صرف', date: payDate.value,
-    person: payTo.value, amount: payAmount.value, box: payBox.value,
-  })
-  alert('✅ تم ترحيل سند الصرف: ' + payNo.value)
-  payNo.value = 'PAY-2026-' + String(payLog.value.length + 1).padStart(3, '0')
-  payTo.value = ''
-  payAmount.value = 0
-  tab.value = 'log'
+function openNew() {
+  formError.value = ''
+  form.value = { customerId: null, amount: 0, method: 'cash', date: new Date().toISOString().slice(0, 10), notes: '' }
+  showForm.value = true
 }
+
+async function save() {
+  saving.value = true
+  formError.value = ''
+  try {
+    await requirePermission('receipts', 'ترحيل سند قبض')
+    const f = form.value
+    if (!f.customerId) throw new Error('اختر عميلًا')
+    if (!f.amount || f.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')
+    const debtor = debtors.value.find(c => c.id === f.customerId)
+    if (!debtor) throw new Error('العميل لا يملك ذمم مستحقة')
+    if (f.amount > debtor.balance + 0.005) throw new Error(`المبلغ أكبر من ذمم العميل (${fmt(debtor.balance)})`)
+    const id = await db.collections.add({
+      customerId: f.customerId, date: f.date, method: f.method, amount: f.amount,
+      notes: f.notes, status: 'posted', createdAt: Date.now(),
+    })
+    await postCollectionJournal({ collectionId: id, amount: f.amount, method: f.method })
+    const s = await currentSession()
+    await db.auditLogs.add({ userId: s?.userId ?? 0, userName: s?.userName ?? 'مجهول', action: 'receipt_voucher', refKind: 'collection', refId: id, detail: null, createdAt: Date.now() })
+    showForm.value = false
+    await loadData()
+  } catch (e) {
+    formError.value = e.message
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(loadData)
 </script>
 
 <style scoped>
-.screen-layout { display: flex; flex: 1; gap: 8px; min-height: 0; }
-
-.screen-sidebar {
-  width: 140px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px;
-  flex-shrink: 0;
-}
-
-.screen-tab {
-  height: 40px;
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  text-align: right;
-  padding: 0 8px;
-  border-radius: 2px;
-  white-space: nowrap;
-}
-.screen-tab:hover { background: var(--color-bg-primary); }
-.screen-tab.active {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  font-weight: bold;
-  border-color: var(--color-primary);
-}
-
-.screen-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.full-height { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-
-.screen-toolbar {
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 2px;
-  margin-bottom: 6px;
-  flex-shrink: 0;
-}
-
-.invoice-header { display: flex; gap: 8px; margin-bottom: 6px; flex-shrink: 0; }
-
-.header-block {
-  flex: 1;
-  border: 1px solid var(--color-border);
-  border-radius: 2px;
-  padding: 6px 8px;
-  background: var(--color-bg-secondary);
-}
-
-.block-title {
-  font-size: var(--font-size-sm);
-  font-weight: bold;
-  color: var(--color-primary);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 3px;
-  margin-bottom: 5px;
-}
-
-.field-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.field-row label { width: 90px; font-size: var(--font-size-sm); flex-shrink: 0; color: var(--color-text-secondary); }
-
+.receipt-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.screen-toolbar { display: flex; gap: 6px; padding: 6px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 2px; margin-bottom: 6px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
+.toolbar-spacer { flex: 1; }
+.toolbar-info { font-size: 12px; color: var(--color-text-secondary); }
 .table-scroll { flex: 1; overflow: auto; background: var(--color-bg-primary); min-height: 0; }
-
-.invoice-no { color: var(--color-primary); font-weight: bold; }
-
-.form-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  padding: 6px;
-  background: var(--color-bg-secondary);
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.flex-col { flex-direction: column; }
-
-@media (max-width: 768px) {
-  .screen-layout { flex-direction: column; }
-  .screen-sidebar { width: 100%; flex-direction: row; overflow-x: auto; }
-  .screen-tab { width: auto; min-width: 110px; }
-  .invoice-header { flex-direction: column; }
-}
+.empty-state { text-align: center; color: var(--color-text-secondary); padding: 18px; }
+.num { text-align: left; direction: ltr; }
+.btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px; }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-secondary { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); }
+.form-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.form-modal { background: var(--color-bg-primary); border: 2px solid var(--color-primary); border-radius: 4px; width: 480px; max-width: 94vw; box-shadow: 4px 4px 16px rgba(0,0,0,0.3); }
+.modal-title { display: flex; justify-content: space-between; align-items: center; background: var(--color-primary); color: #fff; font-weight: bold; padding: 6px 12px; }
+.close-btn { background: transparent; border: none; color: #fff; cursor: pointer; }
+.modal-body { padding: 12px; }
+.field-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.field-row label { width: 90px; font-size: 13px; flex-shrink: 0; color: var(--color-text-secondary); }
+.input-field { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 3px; font-size: 13px; background: #fff; flex: 1; }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 12px; background: var(--color-bg-secondary); border-top: 1px solid var(--color-border); }
+.form-error { color: #b71c1c; font-size: 12px; flex: 1; }
+@media (max-width: 768px) { .field-row { flex-wrap: wrap; } .field-row label { width: 100%; } .screen-toolbar { flex-direction: column; align-items: stretch; } }
 </style>

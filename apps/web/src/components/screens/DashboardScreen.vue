@@ -1,316 +1,129 @@
 <template>
-  <!-- ========== لوحة التحكم ========== -->
-  <div class="dashboard">
-    <!-- بطاقات الإحصائيات -->
-    <div class="stats-row">
-      <div class="stat-card" v-for="s in stats" :key="s.label">
-        <div class="stat-icon">{{ s.icon }}</div>
-        <div class="stat-info">
-          <div class="stat-value">{{ s.value }}</div>
-          <div class="stat-label">{{ s.label }}</div>
-        </div>
-      </div>
+  <div class="dashboard-screen">
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">مبيعات اليوم</div><div class="kpi-value num">{{ fmt(kpi.todaySales) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">مبيعات هذا الشهر</div><div class="kpi-value num">{{ fmt(kpi.monthSales) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">رصيد الصندوق</div><div class="kpi-value num">{{ fmt(kpi.cashBalance) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">قيمة المخزون</div><div class="kpi-value num">{{ fmt(kpi.inventoryValue) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">ذمم عملاء مستحقة</div><div class="kpi-value num">{{ fmt(kpi.receivables) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">ذمم موردون مستحقة</div><div class="kpi-value num">{{ fmt(kpi.payables) }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">عدد الأصناف</div><div class="kpi-value">{{ kpi.itemsCount }}</div></div>
+      <div class="kpi-card"><div class="kpi-label">أصناف نافذة/قريبة الانتهاء</div><div class="kpi-value num" :class="{ warn: kpi.expiryAlert > 0 }">{{ kpi.expiryAlert }}</div></div>
     </div>
 
-    <div class="dashboard-grid">
-      <!-- تنبيهات المخزون -->
-      <div class="dash-card">
-        <div class="card-title">⚠️ تنبيهات المخزون</div>
-        <div class="table-container">
-          <table class="dense-table">
-            <thead>
-              <tr>
-                <th>الكود</th>
-                <th>الصنف</th>
-                <th>الرصيد</th>
-                <th>الحد الأدنى</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in stockAlerts" :key="d.code">
-                <td>{{ d.code }}</td>
-                <td style="font-weight: bold">{{ d.name }}</td>
-                <td :class="{ 'status-out': d.stock === 0, 'status-low': d.stock > 0 }">{{ d.stock }}</td>
-                <td>{{ d.minStock }}</td>
-                <td :class="{ 'status-out': d.stock === 0, 'status-low': d.stock > 0 }">
-                  {{ d.stock === 0 ? 'نفذ' : 'منخفض' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <div class="panel-title">آخر 10 قيود محاسبية</div>
+        <table class="dense-table">
+          <thead><tr><th style="width:40px">#</th><th style="width:90px">التاريخ</th><th>الوصف</th><th style="width:65px">المرجع</th></tr></thead>
+          <tbody>
+            <tr v-for="e in recentEntries" :key="e.id">
+              <td>{{ e.id }}</td><td>{{ e.date }}</td>
+              <td style="font-weight:bold">{{ e.description || 'بدون وصف' }}</td>
+              <td class="ref-cell">{{ refKindLabel(e.refKind) }}</td>
+            </tr>
+            <tr v-if="recentEntries.length === 0"><td colspan="4" class="empty-state">لا توجد قيود بعد — ابدأ بعملية بيع أو شراء</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <!-- تنبيهات الصلاحية -->
-      <div class="dash-card">
-        <div class="card-title">📅 تنبيهات الصلاحية (قريب الانتهاء)</div>
-        <div class="table-container">
-          <table class="dense-table">
-            <thead>
-              <tr>
-                <th>الصنف</th>
-                <th>الصلاحية</th>
-                <th>الرصيد</th>
-                <th>الأيام المتبقية</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in expiringSoon" :key="d.code">
-                <td style="font-weight: bold">{{ d.name }}</td>
-                <td :class="expiryClass(d.expiry)">{{ d.expiry }}</td>
-                <td>{{ d.stock }}</td>
-                <td>{{ daysLeft(d.expiry) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- آخر الفواتير -->
-      <div class="dash-card">
-        <div class="card-title">🧾 آخر فواتير المبيعات</div>
-        <div class="table-container">
-          <table class="dense-table">
-            <thead>
-              <tr>
-                <th>رقم الفاتورة</th>
-                <th>المريض</th>
-                <th>الطبيب</th>
-                <th>الإجمالي</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="inv in recentInvoices" :key="inv.number">
-                <td>{{ inv.number }}</td>
-                <td>{{ inv.patient }}</td>
-                <td>{{ inv.doctor }}</td>
-                <td style="font-weight: bold">{{ fmt(inv.total) }}</td>
-                <td>
-                  <span class="badge" :class="inv.posted ? 'badge-posted' : 'badge-draft'">
-                    {{ inv.posted ? 'مرحّلة' : 'مسودة' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- مبيعات اليوم -->
-      <div class="dash-card">
-        <div class="card-title">💰 مبيعات اليوم</div>
-        <div class="chart-placeholder">
-          <div class="big-number">{{ fmt(todaySales) }}</div>
-          <div class="big-label">ريال يمني</div>
-          <div class="chart-bars">
-            <div
-              v-for="h in hourlySales"
-              :key="h.hour"
-              class="bar-item"
-            >
-              <div class="bar" :style="{ height: Math.max(4, (h.value / maxHour) * 100) + '%' }"></div>
-              <div class="bar-label">{{ h.hour }}</div>
-            </div>
-          </div>
-        </div>
+      <div class="dash-panel">
+        <div class="panel-title">أكثر الأصناف مبيعًا</div>
+        <table class="dense-table">
+          <thead><tr><th>الصنف</th><th style="width:75px">الكمية المباعة</th></tr></thead>
+          <tbody>
+            <tr v-for="it in topItems" :key="it.id">
+              <td>{{ it.name }}</td><td class="num">{{ it.sold }}</td>
+            </tr>
+            <tr v-if="topItems.length === 0"><td colspan="2" class="empty-state">لا توجد مبيعات بعد</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { sampleDrugs } from '../../data/sampleData.js'
+import { ref, onMounted } from 'vue'
+import { db, activeItems } from '../../db/database.js'
+import { fmt, accountBalance } from '../../db/engine.js'
 
-const stats = computed(() => [
-  { icon: '💊', label: 'إجمالي الأصناف', value: sampleDrugs.length },
-  { icon: '📦', label: 'قيمة المخزون', value: fmt(sampleDrugs.reduce((s, d) => s + d.stock * d.buyPrice, 0)) },
-  { icon: '⚠️', label: 'رصيد منخفض', value: sampleDrugs.filter((d) => d.stock > 0 && d.stock <= d.minStock).length },
-  { icon: '🚫', label: 'نفذ من المخزون', value: sampleDrugs.filter((d) => d.stock === 0).length },
-  { icon: '📅', label: 'ينتهي قريباً', value: sampleDrugs.filter((d) => isExpiringSoon(d.expiry)).length },
-  { icon: '👥', label: 'المرضى', value: 8 },
-  { icon: '🩺', label: 'الأطباء', value: 6 },
-  { icon: '💵', label: 'مبيعات اليوم', value: fmt(todaySalesValue) },
-])
+const kpi = ref({ todaySales: 0, monthSales: 0, cashBalance: 0, inventoryValue: 0, receivables: 0, payables: 0, itemsCount: 0, expiryAlert: 0 })
+const recentEntries = ref([])
+const topItems = ref([])
 
-const todaySalesValue = 124500
-const todaySales = todaySalesValue
+function refKindLabel(k) { return { sale: 'بيع', purchase: 'شراء', collection: 'تحصيل', supplierPayment: 'سداد مورد', saleReturn: 'مرتجع', manual: 'قيد يدوي', opening: 'افتتاحي' }[k] || k || '—' }
 
-const stockAlerts = computed(() =>
-  sampleDrugs.filter((d) => d.stock <= d.minStock).slice(0, 6)
-)
+function todayStr() { return new Date().toISOString().slice(0, 10) }
+function monthStart() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` }
 
-const expiringSoon = computed(() =>
-  sampleDrugs
-    .map((d) => ({ ...d, days: Math.floor((new Date(d.expiry) - new Date()) / 86400000) }))
-    .filter((d) => d.days <= 120 && d.days > 0)
-    .slice(0, 6)
-)
+async function loadKpi() {
+  const today = todayStr()
+  const month = monthStart()
+  const sales = await db.salesInvoices.toArray()
+  const todaySales = sales.filter(s => s.date === today && s.status === 'posted').reduce((sum, s) => sum + (s.total || 0), 0)
+  const monthSales = sales.filter(s => s.date >= month && s.status === 'posted').reduce((sum, s) => sum + (s.total || 0), 0)
 
-function isExpiringSoon(exp) {
-  return new Date(exp) - new Date() <= 120 * 86400000
+  // حسابات النظام
+  const accounts = await db.chartOfAccounts.toArray()
+  const get = code => accounts.find(a => a.code === code)
+  const cashId = get('1-1-1')?.id
+  const recvId = get('1-2')?.id
+  const payId = get('2-1')?.id
+
+  const cashBalance = cashId ? await accountBalance(cashId) : 0
+  const receivables = recvId ? await accountBalance(recvId) : 0
+  const payables = payId ? await accountBalance(payId) : 0
+
+  // قيمة المخزون = مجموع qty×cost لكل التشغيلات
+  const batches = await db.batches.toArray()
+  const inventoryValue = batches.filter(b => !b.quarantined && b.qty > 0).reduce((s, b) => s + b.qty * (b.cost || 0), 0)
+
+  // أصناف قريبة الانتهاء (خلال 90 يومًا)
+  const soon = new Date(); soon.setDate(soon.getDate() + 90)
+  const soonStr = soon.toISOString().slice(0, 10)
+  const expiryAlert = batches.filter(b => !b.quarantined && b.qty > 0 && b.expDate && b.expDate <= soonStr).length
+
+  const itemsCount = (await activeItems()).length
+
+  kpi.value = { todaySales, monthSales, cashBalance, inventoryValue, receivables, payables, itemsCount, expiryAlert }
 }
 
-function daysLeft(exp) {
-  const days = Math.floor((new Date(exp) - new Date()) / 86400000)
-  return days + ' يوم'
+async function loadRecentEntries() {
+  const entries = await db.journalEntries.orderBy('id').reverse().limit(10).toArray()
+  recentEntries.value = entries.sort((a, b) => b.id - a.id)
 }
 
-function expiryClass(exp) {
-  const days = (new Date(exp) - new Date()) / 86400000
-  if (days <= 60) return 'expiry-orange'
-  if (days <= 120) return 'expiry-yellow'
-  return 'expiry-green'
+async function loadTopItems() {
+  const lines = await db.salesLines.toArray()
+  const items = await db.items.toArray()
+  const map = {}
+  for (const l of lines) map[l.itemId] = (map[l.itemId] || 0) + l.qty
+  const names = Object.fromEntries(items.map(i => [i.id, i.name]))
+  topItems.value = Object.entries(map)
+    .map(([id, sold]) => ({ id: Number(id), name: names[id] || `صنف #${id}`, sold }))
+    .sort((a, b) => b.sold - a.sold)
+    .slice(0, 5)
 }
 
-const recentInvoices = [
-  { number: 'INV-2026-014', patient: 'أحمد محمد علي', doctor: 'د. عبدالكريم الشميري', total: 18500, posted: true },
-  { number: 'INV-2026-013', patient: 'فاطمة عبدالله حسن', doctor: 'د. سمية المقطري', total: 42300, posted: true },
-  { number: 'INV-2026-012', patient: 'علي حسين محمد', doctor: '—', total: 7800, posted: true },
-  { number: 'INV-2026-011', patient: 'خالد عمر سعيد', doctor: 'د. فيصل الحيمي', total: 55900, posted: false },
-]
-
-const hourlySales = [
-  { hour: '8ص', value: 42000 },
-  { hour: '10ص', value: 68000 },
-  { hour: '12م', value: 124000 },
-  { hour: '2م', value: 91000 },
-  { hour: '4م', value: 55000 },
-  { hour: '6م', value: 78000 },
-  { hour: '8م', value: 32000 },
-]
-const maxHour = Math.max(...hourlySales.map((h) => h.value))
-
-function fmt(n) {
-  return String(n ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
+onMounted(() => { loadKpi(); loadRecentEntries(); loadTopItems() })
 </script>
 
 <style scoped>
-.dashboard {
-  padding: var(--space-2);
-  overflow-y: auto;
-  height: 100%;
-}
-
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.stat-card {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--space-2) var(--space-3);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.stat-icon {
-  font-size: 22px;
-}
-
-.stat-value {
-  font-size: var(--font-size-lg);
-  font-weight: bold;
-  color: var(--color-primary);
-}
-
-.stat-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-3);
-}
-
-.dash-card {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  display: flex;
-  flex-direction: column;
-  min-height: 240px;
-}
-
-.card-title {
-  font-size: var(--font-size-base);
-  font-weight: bold;
-  color: var(--color-primary);
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.table-container {
-  overflow: auto;
-  flex: 1;
-}
-
-.table-container table {
-  min-width: 320px;
-}
-
-.status-low { color: var(--color-warning); font-weight: bold }
-.status-out { color: var(--color-error); font-weight: bold }
-
-.expiry-green { color: var(--color-success); font-weight: bold }
-.expiry-yellow { color: #f9a825; font-weight: bold }
-.expiry-orange { color: var(--color-warning); font-weight: bold }
-
-.chart-placeholder {
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.big-number {
-  font-size: 28px;
-  font-weight: bold;
-  color: var(--color-primary);
-}
-
-.big-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin-top: -8px;
-}
-
-.chart-bars {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  height: 110px;
-  padding-top: var(--space-2);
-}
-
-.bar-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.bar {
-  width: 26px;
-  background: linear-gradient(180deg, #1565c0, var(--color-primary));
-  border-radius: 2px 2px 0 0;
-  min-height: 4px;
-}
-
-.bar-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
+.dashboard-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto; padding: 4px; background: var(--color-bg-primary); }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.kpi-card { background: #fff; border: 1px solid var(--color-border); border-radius: 4px; padding: 10px 12px; box-shadow: 1px 1px 3px rgba(0,0,0,0.05); }
+.kpi-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.kpi-value { font-size: 19px; font-weight: bold; color: var(--color-primary); }
+.kpi-value.num { direction: ltr; text-align: left; }
+.kpi-value.warn { color: #e65100; }
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; min-height: 0; }
+.dash-panel { display: flex; flex-direction: column; border: 1px solid var(--color-border); background: #fff; border-radius: 4px; min-height: 0; }
+.panel-title { background: var(--color-bg-secondary); border-bottom: 1px solid var(--color-border); padding: 6px 10px; font-size: 13px; font-weight: bold; }
+.panel-title ~ table { flex: 1; overflow: auto; }
+.empty-state { text-align: center; color: var(--color-text-secondary); padding: 14px; }
+.num { text-align: left; direction: ltr; }
+.ref-cell { font-size: 12px; color: var(--color-text-secondary); }
+@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>

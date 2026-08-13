@@ -1,5 +1,8 @@
 <template>
   <div class="erp-app">
+    <!-- شاشة تسجيل الدخول تُعرض قبل كل شيء حتى المصادقة الفعلية -->
+    <LoginScreen v-if="!authenticated" @logged-in="onLoggedIn" />
+    <template v-else>
     <!-- الشريط العلوي الرئيسي -->
     <MainRibbon
       :active-menu="activeMenu"
@@ -79,8 +82,23 @@
         <template #accounts>
           <AccountsScreen />
         </template>
+        <template #journal>
+          <JournalScreen />
+        </template>
+        <template #reports>
+          <ReportsScreen />
+        </template>
+        <template #purchases>
+          <PurchasesScreen />
+        </template>
+        <template #supplier-payments>
+          <SupplierPaymentsScreen />
+        </template>
         <template #receipt-voucher>
           <ReceiptVoucherScreen />
+        </template>
+        <template #users>
+          <UsersScreen />
         </template>
         <template #generic="{ window: win }">
           <PlaceholderScreen :title="win.title" :description="pageDescription(win.type)" />
@@ -94,16 +112,22 @@
       :active-window="activeWindowId"
       @window-activate="activeWindowId = $event"
     />
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import LoginScreen from './components/screens/LoginScreen.vue'
 import MainRibbon from './components/layout/MainRibbon.vue'
 import Toolbar from './components/layout/Toolbar.vue'
 import Sidebar from './components/layout/Sidebar.vue'
 import Workspace from './components/layout/Workspace.vue'
 import Taskbar from './components/layout/Taskbar.vue'
+import JournalScreen from './components/screens/JournalScreen.vue'
+import ReportsScreen from './components/screens/ReportsScreen.vue'
+import PurchasesScreen from './components/screens/PurchasesScreen.vue'
+import SupplierPaymentsScreen from './components/screens/SupplierPaymentsScreen.vue'
 import SalesInvoiceScreen from './components/screens/SalesInvoiceScreen.vue'
 import PosScreen from './components/screens/PosScreen.vue'
 import ItemsScreen from './components/screens/ItemsScreen.vue'
@@ -119,25 +143,21 @@ import ExpiryScreen from './components/screens/ExpiryScreen.vue'
 import ReceiptVoucherScreen from './components/screens/ReceiptVoucherScreen.vue'
 import AccountsScreen from './components/screens/AccountsScreen.vue'
 import TransfersScreen from './components/screens/TransfersScreen.vue'
+import UsersScreen from './components/screens/UsersScreen.vue'
 import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
 
 // ---- الحالة ----
+// ---- المصادقة ----
+const authenticated = ref(null) // null = جارٍ التحقق، false = غير مسجل
+const currentUser = ref(null)
+
 const activeMenu = ref('dashboard')
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = ref(window.innerWidth <= 768)
 const activeWindowId = ref('win-1')
 const activePage = ref(null)
 
 // النوافذ المفتوحة
-const openWindows = ref([
-  {
-    id: 'win-1',
-    title: 'فاتورة مبيعات #INV-2024-001',
-    type: 'sales-invoice',
-    status: 'draft',
-    minimized: false,
-    maximized: true
-  }
-])
+const openWindows = ref([])
 
 // خريطة الصفحات الجانبية إلى أنواع النوافذ
 const pageWindowTypes = {
@@ -152,7 +172,7 @@ const pageWindowTypes = {
   collections: { type: 'collections', title: 'التحصيل' },
   suppliers: { type: 'suppliers', title: 'الموردون' },
   'purchase-orders': { type: 'generic', title: 'طلبات الشراء' },
-  'purchase-invoices': { type: 'generic', title: 'فواتير المشتريات' },
+  'purchase-invoices': { type: 'purchases', title: 'فواتير المشتريات' },
   'purchase-returns': { type: 'generic', title: 'مرتجعات المشتريات' },
   warehouses: { type: 'generic', title: 'المخازن' },
   expiry: { type: 'expiry', title: 'مراقبة الصلاحية' },
@@ -162,18 +182,20 @@ const pageWindowTypes = {
   'insurance-cards': { type: 'generic', title: 'بطاقات التأمين' },
   'insurance-claims': { type: 'generic', title: 'المطالبات' },
   accounts: { type: 'accounts', title: 'دليل الحسابات' },
-  journal: { type: 'generic', title: 'القيود اليومية' },
+  journal: { type: 'journal', title: 'القيود اليومية' },
   treasury: { type: 'generic', title: 'الصندوق والبنوك' },
-  payable: { type: 'generic', title: 'الذمم (الموردون)' },
-  receivable: { type: 'generic', title: 'الذمم (العملاء)' },
-  'reports-sales': { type: 'generic', title: 'تقارير المبيعات' },
-  'reports-inventory': { type: 'generic', title: 'تقارير المخزون' },
-  'reports-financial': { type: 'generic', title: 'التقارير المالية' },
+  payable: { type: 'supplier-payments', title: 'الذمم (الموردون)' },
+  receivable: { type: 'collections', title: 'الذمم (العملاء)' },
+  'reports-sales': { type: 'reports', title: 'تقارير المبيعات' },
+  'reports-inventory': { type: 'reports', title: 'تقارير المخزون' },
+  'reports-financial': { type: 'reports', title: 'التقارير المالية' },
   'reports-insurance': { type: 'generic', title: 'تقارير التأمين' },
-  users: { type: 'generic', title: 'المستخدمون والأدوار' },
+  users: { type: 'users', title: 'المستخدمون والأدوار' },
   branches: { type: 'generic', title: 'الفروع' },
   settings: { type: 'generic', title: 'إعدادات النظام' },
-  audit: { type: 'generic', title: 'سجل العمليات' },
+  audit: { type: 'reports', title: 'سجل العمليات (Audit Log)' },
+  'aging-customers': { type: 'collections', title: 'أعمار الديون (عملاء / تأمين)' },
+  'aging-suppliers': { type: 'supplier-payments', title: 'أعمار الديون (موردون)' },
   notifications: { type: 'generic', title: 'التنبيهات' },
   stats: { type: 'generic', title: 'الإحصائيات' },
   currencies: { type: 'generic', title: 'العملات' },
@@ -181,8 +203,8 @@ const pageWindowTypes = {
   'fiscal-years': { type: 'generic', title: 'السنوات المالية' },
   'payment-methods': { type: 'generic', title: 'طرق الدفع' },
   'purchase-requests': { type: 'generic', title: 'طلبات الشراء' },
-  receiving: { type: 'generic', title: 'استلام الشحنات' },
-  'supplier-payments': { type: 'generic', title: 'السداد للموردين' },
+  receiving: { type: 'purchases', title: 'استلام الشحنات' },
+  'supplier-payments': { type: 'supplier-payments', title: 'السداد للموردين' },
   'drug-commercial-name': { type: 'generic', title: 'قاعدة بيانات الأدوية — الاسم التجاري' },
   'drug-scientific-name': { type: 'generic', title: 'قاعدة بيانات الأدوية — الاسم العلمي' },
   'drug-manufacturer': { type: 'generic', title: 'قاعدة بيانات الأدوية — الشركة المصنعة' },
@@ -205,8 +227,8 @@ const pageWindowTypes = {
   'payment-voucher': { type: 'generic', title: 'سند صرف' },
   'financial-transfers': { type: 'generic', title: 'التحويلات المالية' },
   cheques: { type: 'generic', title: 'الشيكات' },
-  'opening-entries': { type: 'generic', title: 'القيود الافتتاحية' },
-  posting: { type: 'generic', title: 'الترحيل المحاسبي' },
+  'opening-entries': { type: 'journal', title: 'القيود الافتتاحية' },
+  posting: { type: 'journal', title: 'الترحيل المحاسبي' },
   'period-close': { type: 'generic', title: 'إقفال الفترات' },
   'bank-reconciliation': { type: 'generic', title: 'التسويات البنكية' },
   'aging-customers': { type: 'generic', title: 'أعمار الديون (عملاء / تأمين)' },
@@ -226,10 +248,10 @@ const pageWindowTypes = {
   'rpt-turnover': { type: 'generic', title: 'دوران المخزون' },
   'rpt-movement': { type: 'generic', title: 'حركة الأصناف' },
   'reports-profit': { type: 'generic', title: 'تقارير الربحية' },
-  'trial-balance': { type: 'generic', title: 'ميزان المراجعة' },
-  'general-ledger': { type: 'generic', title: 'الأستاذ العام والمساعد' },
-  'income-statement': { type: 'generic', title: 'قائمة الدخل' },
-  'balance-sheet': { type: 'generic', title: 'الميزانية العمومية' },
+  'trial-balance': { type: 'reports', title: 'ميزان المراجعة' },
+  'general-ledger': { type: 'reports', title: 'الأستاذ العام والمساعد' },
+  'income-statement': { type: 'reports', title: 'قائمة الدخل' },
+  'balance-sheet': { type: 'reports', title: 'الميزانية العمومية' },
   'tax-reports': { type: 'generic', title: 'التقارير الضريبية' },
   'custom-reports': { type: 'generic', title: 'التقارير المخصصة' },
   employees: { type: 'generic', title: 'الموظفون والورديات' },
@@ -350,7 +372,15 @@ const pageDescriptions = {
   about: 'معلومات حول النظام والإصدار.',
 }
 
+const NOT_IMPLEMENTED = new Set([
+  'insurance-companies','insurance-cards','insurance-claims','warehouses','stocktake',
+  'branches','settings','notifications','stats','currencies','taxes',
+  'fiscal-years','payment-methods','cheques','bank-reconciliation','custom-reports',
+  'employees','backup','system-monitor','about','drug-database',
+])
+
 function pageDescription(type) {
+  if (NOT_IMPLEMENTED.has(type)) return 'هذه الشاشة غير منفذة فعليًا في هذا الإصدار.'
   return pageDescriptions[type] ?? 'محتوى هذه الشاشة قيد التطوير...'
 }
 
@@ -412,8 +442,15 @@ function handleKeydown(e) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
+  // تهيئة قاعدة البيانات (المستخدم الافتراضي + دليل الحسابات) ثم التحقق من الجلسة
+  const { initSystem } = await import('./db/database.js')
+  const { currentSession } = await import('./db/session.js')
+  await initSystem()
+  const session = await currentSession()
+  authenticated.value = !!session
+  currentUser.value = session
   // فتح صفحة محددة عبر معلمة URL (مثال: ?page=returns)
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
@@ -430,11 +467,11 @@ onUnmounted(() => {
 // ---- الإجراءات ----
 function handleNew() {
   const newId = 'win-' + Date.now()
-  const count = openWindows.value.length + 1
   openWindows.value.push({
     id: newId,
-    title: `فاتورة مبيعات #INV-2024-${String(count).padStart(3, '0')}`,
-    type: 'sales-invoice',
+    title: 'نقطة البيع POS',
+    type: 'pos',
+    page: 'pos',
     status: 'draft',
     minimized: false,
     maximized: false
@@ -443,15 +480,11 @@ function handleNew() {
 }
 
 function handleSave() {
-  alert('تم الحفظ كمسودة (F8)')
+  // الحفظ الفعلي يتم داخل كل شاشة (تخزين في IndexedDB)
 }
 
 function handlePost() {
-  const win = openWindows.value.find(w => w.id === activeWindowId.value)
-  if (win) {
-    win.status = 'posted'
-    alert('تم الترحيل بنجاح (F10)')
-  }
+  // الترحيل الفعلي يتم داخل كل شاشة (قيود مزدوجة في IndexedDB)
 }
 
 function handlePrint() {
@@ -459,11 +492,16 @@ function handlePrint() {
 }
 
 function handleSearch() {
-  alert('فتح البحث السريع (F3)')
+  // البحث السريع يتم داخل كل شاشة عبر حقول البحث الفعلية
 }
 
 function handleClose() {
   closeWindow(activeWindowId.value)
+}
+
+function onLoggedIn(user) {
+  authenticated.value = true
+  currentUser.value = user
 }
 
 function closeWindow(id) {
