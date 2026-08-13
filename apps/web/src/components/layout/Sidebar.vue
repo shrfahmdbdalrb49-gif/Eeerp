@@ -164,7 +164,9 @@ const sectionsByMenu = {
   ],
 }
 
-const currentSections = sectionsByMenu[props.activeMenu] ?? sectionsByMenu.dashboard
+const currentSections = computed(
+  () => sectionsByMenu[props.activeMenu] ?? sectionsByMenu.dashboard
+)
 
 const currentHeaderLabel = computed(() => headerLabel[props.activeMenu] ?? 'القائمة')
 </script>

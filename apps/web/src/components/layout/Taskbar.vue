@@ -6,7 +6,7 @@
       :key="win.id"
       class="taskbar-item"
       :class="{ active: win.id === activeWindow }"
-      @click="$emit('window-activate', win.id)"
+      @click="handleClick(win)"
     >
       <span class="taskbar-icon">📄</span>
       <span class="taskbar-title">{{ win.title }}</span>
@@ -55,7 +55,15 @@ defineProps({
   },
 })
 
-defineEmits(['window-activate'])
+const emit = defineEmits(['window-activate'])
+
+/** عند النقر على نافذة مصغّرة يتم إصدار restore قبل التفعيل */
+function handleClick(win) {
+  if (win.minimized) {
+    win.minimized = false
+  }
+  emit('window-activate', win.id)
+}
 
 /** ساعة حية في شريط المهام */
 const currentTime = ref('')

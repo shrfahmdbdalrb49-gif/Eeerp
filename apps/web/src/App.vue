@@ -22,7 +22,9 @@
       <Sidebar
         :active-menu="activeMenu"
         :collapsed="sidebarCollapsed"
+        :active-page="activePage"
         @toggle="sidebarCollapsed = !sidebarCollapsed"
+        @select="activePage = $event"
       />
 
       <!-- مساحة العمل (النوافذ) -->
@@ -31,6 +33,8 @@
         :active-window="activeWindowId"
         @window-activate="activeWindowId = $event"
         @window-close="closeWindow"
+        @window-minimize="minimizeWindow"
+        @window-maximize="maximizeWindow"
       />
     </div>
 
@@ -55,6 +59,7 @@ import Taskbar from './components/layout/Taskbar.vue'
 const activeMenu = ref('sales')
 const sidebarCollapsed = ref(false)
 const activeWindowId = ref('win-1')
+const activePage = ref(null)
 
 // النوافذ المفتوحة
 const openWindows = ref([
@@ -155,6 +160,20 @@ function closeWindow(id) {
     activeWindowId.value = openWindows.value[openWindows.value.length - 1].id
   } else {
     activeWindowId.value = null
+  }
+}
+
+function minimizeWindow(id) {
+  const win = openWindows.value.find(w => w.id === id)
+  if (win) {
+    win.minimized = true
+  }
+}
+
+function maximizeWindow(id) {
+  const win = openWindows.value.find(w => w.id === id)
+  if (win) {
+    win.maximized = !win.maximized
   }
 }
 </script>
