@@ -125,7 +125,7 @@ function handleNew() {
     type: 'sales-invoice',
     status: 'draft',
     minimized: false,
-    maximized: true
+    maximized: false
   })
   activeWindowId.value = newId
 }
