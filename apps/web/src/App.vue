@@ -24,7 +24,7 @@
         :collapsed="sidebarCollapsed"
         :active-page="activePage"
         @toggle="sidebarCollapsed = !sidebarCollapsed"
-        @select="activePage = $event"
+        @select="selectPage($event)"
       />
 
       <!-- مساحة العمل (النوافذ) -->
@@ -35,7 +35,30 @@
         @window-close="closeWindow"
         @window-minimize="minimizeWindow"
         @window-maximize="maximizeWindow"
-      />
+      >
+        <!-- محتوى النوافذ الداخلية -->
+        <template #sales-invoice="{ window: win }">
+          <SalesInvoiceScreen />
+        </template>
+        <template #pos>
+          <PosScreen />
+        </template>
+        <template #items>
+          <ItemsScreen />
+        </template>
+        <template #customers>
+          <CustomersScreen />
+        </template>
+        <template #doctors>
+          <DoctorsScreen />
+        </template>
+        <template #dashboard>
+          <DashboardScreen />
+        </template>
+        <template #generic="{ window: win }">
+          <PlaceholderScreen :title="win.title" :description="pageDescription(win.type)" />
+        </template>
+      </Workspace>
     </div>
 
     <!-- شريط المهام السفلي -->
@@ -54,6 +77,13 @@ import Toolbar from './components/layout/Toolbar.vue'
 import Sidebar from './components/layout/Sidebar.vue'
 import Workspace from './components/layout/Workspace.vue'
 import Taskbar from './components/layout/Taskbar.vue'
+import SalesInvoiceScreen from './components/screens/SalesInvoiceScreen.vue'
+import PosScreen from './components/screens/PosScreen.vue'
+import ItemsScreen from './components/screens/ItemsScreen.vue'
+import CustomersScreen from './components/screens/CustomersScreen.vue'
+import DoctorsScreen from './components/screens/DoctorsScreen.vue'
+import DashboardScreen from './components/screens/DashboardScreen.vue'
+import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
 
 // ---- الحالة ----
 const activeMenu = ref('sales')
@@ -72,6 +102,108 @@ const openWindows = ref([
     maximized: true
   }
 ])
+
+// خريطة الصفحات الجانبية إلى أنواع النوافذ
+const pageWindowTypes = {
+  pos: { type: 'pos', title: 'نقطة البيع POS' },
+  customers: { type: 'customers', title: 'العملاء (المرضى)' },
+  doctors: { type: 'doctors', title: 'الأطباء' },
+  items: { type: 'items', title: 'الأصناف - الأدوية والمستلزمات' },
+  dashboard: { type: 'dashboard', title: 'لوحة التحكم' },
+  invoices: { type: 'sales-invoice', title: 'فواتير المبيعات' },
+  prescriptions: { type: 'generic', title: 'الوصفات الطبية' },
+  returns: { type: 'generic', title: 'مرتجعات المبيعات' },
+  collections: { type: 'generic', title: 'التحصيل' },
+  suppliers: { type: 'generic', title: 'الموردون' },
+  'purchase-orders': { type: 'generic', title: 'طلبات الشراء' },
+  'purchase-invoices': { type: 'generic', title: 'فواتير المشتريات' },
+  'purchase-returns': { type: 'generic', title: 'مرتجعات المشتريات' },
+  warehouses: { type: 'generic', title: 'المخازن' },
+  expiry: { type: 'generic', title: 'مراقبة الصلاحية' },
+  stocktake: { type: 'generic', title: 'الجرد' },
+  transfers: { type: 'generic', title: 'تحويلات الفروع' },
+  'insurance-companies': { type: 'generic', title: 'شركات التأمين' },
+  'insurance-cards': { type: 'generic', title: 'بطاقات التأمين' },
+  'insurance-claims': { type: 'generic', title: 'المطالبات' },
+  accounts: { type: 'generic', title: 'دليل الحسابات' },
+  journal: { type: 'generic', title: 'القيود اليومية' },
+  treasury: { type: 'generic', title: 'الصندوق والبنوك' },
+  payable: { type: 'generic', title: 'الذمم (الموردون)' },
+  receivable: { type: 'generic', title: 'الذمم (العملاء)' },
+  'reports-sales': { type: 'generic', title: 'تقارير المبيعات' },
+  'reports-inventory': { type: 'generic', title: 'تقارير المخزون' },
+  'reports-financial': { type: 'generic', title: 'التقارير المالية' },
+  'reports-insurance': { type: 'generic', title: 'تقارير التأمين' },
+  users: { type: 'generic', title: 'المستخدمون والأدوار' },
+  branches: { type: 'generic', title: 'الفروع' },
+  settings: { type: 'generic', title: 'إعدادات النظام' },
+  audit: { type: 'generic', title: 'سجل العمليات' },
+  notifications: { type: 'generic', title: 'التنبيهات' },
+}
+
+const pageDescriptions = {
+  pos: 'شاشة نقطة البيع للمبيعات السريعة بالبحث عن الأدوية وإتمام البيع الفوري.',
+  customers: 'سجل المرضى والعملاء مع أرصدتهم الآجلة ونوع التأمين.',
+  doctors: 'دليل الأطباء وتخصصاتهم وأرقام التراخيص.',
+  items: 'جدول الأصناف والأدوية مع البحث والفلترة وأرصدة المخزون والصلاحية.',
+  dashboard: 'لوحة التحكم بإحصائيات المخزون والمبيعات والتنبيهات.',
+  invoices: 'سجل فواتير المبيعات السابقة والقدرة على إعادة فتح أي فاتورة.',
+  returns: 'مرتجعات المبيعات وإرجاع الأصناف من العملاء.',
+  collections: 'شاشة التحصيل من العملاء الآجلين.',
+  prescriptions: 'إدارة الوصفات الطبية ووصف الأدوية من قبل الأطباء.',
+  suppliers: 'دليل الموردين وبيانات الاتصال ورصيدهم.',
+  'purchase-orders': 'إنشاء ومتابعة أوامر شراء الأدوية من الموردين.',
+  'purchase-invoices': 'تسجيل فواتير المشتريات الواردة من الموردين.',
+  'purchase-returns': 'إرجاع الأصناف للموردين.',
+  warehouses: 'إدارة المخازن وأرصدة كل مخزن.',
+  expiry: 'مراقبة أصناف المخزون منتهية أو قريبة الانتهاء.',
+  stocktake: 'عمليات الجرد الدوري ومقارنة الأرصدة الفعلية.',
+  transfers: 'تحويلات الأصناف بين الفروع والمخازن.',
+  'insurance-companies': 'شركات التأمين المتعاقد معها وبنود العقود.',
+  'insurance-cards': 'بطاقات التأمين للمرضى وسقف التغطية.',
+  'insurance-claims': 'المطالبات التأمينية ومراحل مراجعتها.',
+  accounts: 'دليل الحسابات الشجري (الدفتر الأستاذ).',
+  journal: 'القيود اليومية المحاسبية.',
+  treasury: 'إدارة الصندوق والبنوك.',
+  payable: 'أرصدة الموردين المستحقة.',
+  receivable: 'أرصدة العملاء المستحقة.',
+  'reports-sales': 'تقارير المبيعات حسب الفترة والفرع والمستخدم.',
+  'reports-inventory': 'تقارير المخزون والحركة.',
+  'reports-financial': 'التقارير المالية والقوائم.',
+  'reports-insurance': 'تقارير التأمين والمطالبات.',
+  users: 'إدارة المستخدمين وصلاحياتهم.',
+  branches: 'إدارة الفروع.',
+  settings: 'إعدادات النظام العامة.',
+  audit: 'سجل العمليات والمستخدمين.',
+  notifications: 'التنبيهات والإشعارات.',
+}
+
+function pageDescription(type) {
+  return pageDescriptions[type] ?? 'محتوى هذه الشاشة قيد التطوير...'
+}
+
+// فتح شاشة من القائمة الجانبية
+function selectPage(page) {
+  if (!page || !pageWindowTypes[page]) return
+  const mapping = pageWindowTypes[page]
+  const exists = openWindows.value.find((w) => w.page === page && mapping.type !== 'generic')
+  if (exists) {
+    activeWindowId.value = exists.id
+    exists.minimized = false
+    return
+  }
+  const newId = 'win-' + Date.now()
+  openWindows.value.push({
+    id: newId,
+    title: mapping.title,
+    type: mapping.type,
+    page,
+    status: 'draft',
+    minimized: false,
+    maximized: false,
+  })
+  activeWindowId.value = newId
+}
 
 // ---- اختصارات لوحة المفاتيح ----
 function handleKeydown(e) {
