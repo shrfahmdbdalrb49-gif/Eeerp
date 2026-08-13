@@ -61,6 +61,27 @@
         <template #prescriptions>
           <PrescriptionsScreen />
         </template>
+        <template #returns>
+          <ReturnsScreen />
+        </template>
+        <template #collections>
+          <CollectionsScreen />
+        </template>
+        <template #suppliers>
+          <SuppliersScreen />
+        </template>
+        <template #expiry>
+          <ExpiryScreen />
+        </template>
+        <template #transfers>
+          <TransfersScreen />
+        </template>
+        <template #accounts>
+          <AccountsScreen />
+        </template>
+        <template #receipt-voucher>
+          <ReceiptVoucherScreen />
+        </template>
         <template #generic="{ window: win }">
           <PlaceholderScreen :title="win.title" :description="pageDescription(win.type)" />
         </template>
@@ -91,6 +112,13 @@ import DoctorsScreen from './components/screens/DoctorsScreen.vue'
 import DashboardScreen from './components/screens/DashboardScreen.vue'
 import InvoicesScreen from './components/screens/InvoicesScreen.vue'
 import PrescriptionsScreen from './components/screens/PrescriptionsScreen.vue'
+import ReturnsScreen from './components/screens/ReturnsScreen.vue'
+import CollectionsScreen from './components/screens/CollectionsScreen.vue'
+import SuppliersScreen from './components/screens/SuppliersScreen.vue'
+import ExpiryScreen from './components/screens/ExpiryScreen.vue'
+import ReceiptVoucherScreen from './components/screens/ReceiptVoucherScreen.vue'
+import AccountsScreen from './components/screens/AccountsScreen.vue'
+import TransfersScreen from './components/screens/TransfersScreen.vue'
 import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
 
 // ---- الحالة ----
@@ -120,20 +148,20 @@ const pageWindowTypes = {
   dashboard: { type: 'dashboard', title: 'لوحة التحكم' },
   invoices: { type: 'invoices', title: 'فواتير المبيعات' },
   prescriptions: { type: 'prescriptions', title: 'الوصفات الطبية' },
-  returns: { type: 'generic', title: 'مرتجعات المبيعات' },
-  collections: { type: 'generic', title: 'التحصيل' },
-  suppliers: { type: 'generic', title: 'الموردون' },
+  returns: { type: 'returns', title: 'مرتجعات المبيعات' },
+  collections: { type: 'collections', title: 'التحصيل' },
+  suppliers: { type: 'suppliers', title: 'الموردون' },
   'purchase-orders': { type: 'generic', title: 'طلبات الشراء' },
   'purchase-invoices': { type: 'generic', title: 'فواتير المشتريات' },
   'purchase-returns': { type: 'generic', title: 'مرتجعات المشتريات' },
   warehouses: { type: 'generic', title: 'المخازن' },
-  expiry: { type: 'generic', title: 'مراقبة الصلاحية' },
+  expiry: { type: 'expiry', title: 'مراقبة الصلاحية' },
   stocktake: { type: 'generic', title: 'الجرد' },
-  transfers: { type: 'generic', title: 'تحويلات الفروع' },
+  transfers: { type: 'transfers', title: 'تحويلات الفروع' },
   'insurance-companies': { type: 'generic', title: 'شركات التأمين' },
   'insurance-cards': { type: 'generic', title: 'بطاقات التأمين' },
   'insurance-claims': { type: 'generic', title: 'المطالبات' },
-  accounts: { type: 'generic', title: 'دليل الحسابات' },
+  accounts: { type: 'accounts', title: 'دليل الحسابات' },
   journal: { type: 'generic', title: 'القيود اليومية' },
   treasury: { type: 'generic', title: 'الصندوق والبنوك' },
   payable: { type: 'generic', title: 'الذمم (الموردون)' },
@@ -173,7 +201,7 @@ const pageWindowTypes = {
   settlements: { type: 'generic', title: 'التسويات' },
   'cash-boxes': { type: 'generic', title: 'الصناديق' },
   banks: { type: 'generic', title: 'البنوك' },
-  'receipt-voucher': { type: 'generic', title: 'سند قبض' },
+  'receipt-voucher': { type: 'receipt-voucher', title: 'سند قبض' },
   'payment-voucher': { type: 'generic', title: 'سند صرف' },
   'financial-transfers': { type: 'generic', title: 'التحويلات المالية' },
   cheques: { type: 'generic', title: 'الشيكات' },
@@ -386,6 +414,13 @@ function handleKeydown(e) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
+  // فتح صفحة محددة عبر معلمة URL (مثال: ?page=returns)
+  const params = new URLSearchParams(window.location.search)
+  const page = params.get('page')
+  if (page && pageWindowTypes[page]) {
+    openWindows.value = []
+    selectPage(page)
+  }
 })
 
 onUnmounted(() => {
