@@ -11,7 +11,9 @@
     <!-- الشريط العلوي الرئيسي -->
     <MainRibbon
       :active-menu="activeMenu"
-      @menu-change="activeMenu = $event"
+      :user-name="currentUser?.fullName || 'مدير النظام'"
+      :role-label="roleLabel"
+      @menu-change="handleHeaderMenuChange"
     />
 
     <!-- شريط الأدوات -->
@@ -128,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LoginScreen from './components/screens/LoginScreen.vue'
 import MainRibbon from './components/layout/MainRibbon.vue'
 import Toolbar from './components/layout/Toolbar.vue'
@@ -172,6 +174,19 @@ function dismissDemoBanner() {
 }
 
 const activeMenu = ref('dashboard')
+const roleLabel = computed(() => {
+  const roles = { admin: 'مدير النظام', cashier: 'كاشير', accountant: 'محاسب' }
+  return roles[currentUser.value?.role] || currentUser.value?.role || 'مدير النظام'
+})
+
+/** معالجة أحداث الهيدر: menu-change(value) للتبديل العادي، و('search', page) للبحث السريع */
+function handleHeaderMenuChange(valueOrEvent, page) {
+  if (page) {
+    selectPage(page)
+    return
+  }
+  activeMenu.value = valueOrEvent
+}
 const sidebarCollapsed = ref(window.innerWidth <= 768)
 const activeWindowId = ref('win-1')
 const activePage = ref(null)
