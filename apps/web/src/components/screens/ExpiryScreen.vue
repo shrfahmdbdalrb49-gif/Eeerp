@@ -1,62 +1,82 @@
 <template>
   <div class="expiry-screen">
-    <div class="screen-toolbar">
-      <button :class="['btn', filter === 'all' ? 'btn-primary' : 'btn-secondary']" @click="filter = 'all'">الكل ({{ rows.length }})</button>
-      <button :class="['btn', filter === 'expired' ? 'btn-danger' : 'btn-secondary']" @click="filter = 'expired'">منتهية ({{ expiredCount }})</button>
-      <button :class="['btn', filter === 'near' ? 'btn-primary' : 'btn-secondary']" @click="filter = 'near'">قريبة الانتهاء ({{ nearCount }})</button>
-      <input type="text" class="input-field search" placeholder="🔍 بحث بالصنف أو التشغيلة..." v-model="search" />
-      <span class="toolbar-spacer"></span>
-      <span class="toolbar-info">من تشغيلات المخزون الفعلية في قاعدة البيانات</span>
-    </div>
+    <div class="page-screen">
+      <div class="page-header">
+        <div class="page-title">
+          <h1>انتهاء الصلاحية (FEFO)</h1>
+          <p class="page-subtitle">من تشغيلات المخزون الفعلية في قاعدة البيانات — التشغيلة المنتهية تُعزل تلقائيًا عن البيع</p>
+        </div>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" placeholder="بحث بالصنف أو التشغيلة..." v-model="search" />
+        </div>
+      </div>
 
-    <div class="alert-banner" v-if="expiredCount > 0">
-      ⚠️ تنبيه: يوجد <strong>{{ expiredCount }}</strong> تشغيلة منتهية الصلاحية — أُعيدت تلقائيًا عن البيع
-    </div>
+      <!-- شريط الفلترة + تنبيه -->
+      <div class="controls-row">
+        <div class="segmented">
+          <button :class="['seg', filter === 'all' ? 'active' : '']" @click="filter = 'all'">الكل ({{ rows.length }})</button>
+          <button :class="['seg', filter === 'expired' ? 'active' : '']" @click="filter = 'expired'">منتهية ({{ expiredCount }})</button>
+          <button :class="['seg', filter === 'near' ? 'active' : '']" @click="filter = 'near'">قريبة الانتهاء ({{ nearCount }})</button>
+        </div>
+      </div>
 
-    <div class="table-container table-scroll">
-      <table class="dense-table">
-        <thead>
-          <tr>
-            <th style="width:30px">#</th>
-            <th>كود الصنف</th>
-            <th>اسم الصنف</th>
-            <th>التشغيلة</th>
-            <th>تاريخ الانتهاء</th>
-            <th>الأيام المتبقية</th>
-            <th style="width:85px">الكمية</th>
-            <th style="width:100px">القيمة (تكلفة)</th>
-            <th style="width:85px">الحالة</th>
-            <th style="width:75px">إجراء</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(r, i) in visible" :key="r.batchId">
-            <td>{{ i + 1 }}</td>
-            <td>{{ r.itemCode }}</td>
-            <td style="font-weight:bold">{{ r.itemName }}</td>
-            <td>{{ r.batchNo }}</td>
-            <td dir="ltr">{{ r.expDate }}</td>
-            <td :class="r.days < 0 ? 'text-danger' : r.days <= 90 ? 'text-warning' : ''">{{ r.days }}</td>
-            <td class="num">{{ r.qty }}</td>
-            <td class="num">{{ fmt(r.qty * r.cost) }}</td>
-            <td><span class="status-chip" :class="r.quarantined ? 'quar' : r.days < 0 ? 'expired' : r.days <= 90 ? 'near' : 'ok'">{{ r.quarantined ? 'معزول' : r.days < 0 ? 'منتهية' : r.days <= 90 ? 'قريبة' : 'سليمة' }}</span></td>
-            <td>
-              <button class="btn btn-secondary icon-btn" :title="r.quarantined ? 'إعادة عن البيع' : 'إبعاد عن البيع'" @click="quarantine(r)">{{ r.quarantined ? '🔓' : '🚫' }}</button>
-            </td>
-          </tr>
-          <tr v-if="visible.length === 0">
-            <td colspan="10" class="empty-state">لا توجد تشغيلات صالحة بعد — استلم شحنات شراء فعلية لتظهر هنا</td>
-          </tr>
-        </tbody>
-        <tfoot v-if="visible.length">
-          <tr class="totals-row">
-            <td colspan="6"><strong>إجمالي الكميات</strong></td>
-            <td class="num"><strong>{{ totalQty }}</strong></td>
-            <td class="num"><strong>{{ fmt(totalValue) }}</strong></td>
-            <td colspan="2"></td>
-          </tr>
-        </tfoot>
-      </table>
+      <div class="alert-banner" v-if="expiredCount > 0">
+        <span class="alert-icon">⚠️</span>
+        <span>تنبيه: يوجد <strong>{{ expiredCount }}</strong> تشغيلة منتهية الصلاحية — أُعيدت تلقائيًا عن البيع</span>
+      </div>
+
+      <div class="table-card">
+        <table class="bolt-table">
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th style="width:95px">كود الصنف</th>
+              <th>اسم الصنف</th>
+              <th style="width:100px">التشغيلة</th>
+              <th style="width:110px">تاريخ الانتهاء</th>
+              <th style="width:90px">الأيام المتبقية</th>
+              <th style="width:85px; text-align:left">الكمية</th>
+              <th style="width:120px; text-align:left">القيمة (تكلفة)</th>
+              <th style="width:90px">الحالة</th>
+              <th style="width:75px">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in visible" :key="r.batchId">
+              <td>{{ i + 1 }}</td>
+              <td class="code-cell">{{ r.itemCode }}</td>
+              <td style="font-weight:600">{{ r.itemName }}</td>
+              <td class="mono">{{ r.batchNo }}</td>
+              <td class="mono">{{ r.expDate }}</td>
+              <td :class="r.days < 0 ? 'text-danger' : r.days <= 90 ? 'text-warning' : ''"><b>{{ r.days }}</b></td>
+              <td class="num-cell">{{ r.qty }}</td>
+              <td class="num-cell">{{ fmt(r.qty * r.cost) }}</td>
+              <td><span class="status-pill" :class="r.quarantined ? 'quar' : r.days < 0 ? 'expired' : r.days <= 90 ? 'near' : 'ok'">{{ r.quarantined ? 'معزول' : r.days < 0 ? 'منتهية' : r.days <= 90 ? 'قريبة' : 'سليمة' }}</span></td>
+              <td>
+                <button class="act" :title="r.quarantined ? 'إعادة عن البيع' : 'إبعاد عن البيع'" @click="quarantine(r)">{{ r.quarantined ? '🔓' : '🚫' }}</button>
+              </td>
+            </tr>
+            <tr v-if="visible.length === 0">
+              <td colspan="10" class="empty-row">
+                <div class="empty-box">
+                  <span class="empty-icon">🗓️</span>
+                  <p class="empty-title">لا توجد تشغيلات صالحة بعد</p>
+                  <p class="empty-hint">استلم شحنات شراء فعلية لتظهر هنا</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot v-if="visible.length">
+            <tr class="totals-row">
+              <td colspan="6"><strong>إجمالي الكميات</strong></td>
+              <td class="num-cell"><strong>{{ totalQty }}</strong></td>
+              <td class="num-cell"><strong>{{ fmt(totalValue) }}</strong></td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   </div>
 </template>
@@ -128,28 +148,59 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+/* ============================================
+   انتهاء الصلاحية — نمط bolt.host
+   ============================================ */
 .expiry-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.screen-toolbar { display: flex; gap: 6px; padding: 6px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 2px; margin-bottom: 6px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
-.toolbar-spacer { flex: 1; }
-.toolbar-info { font-size: 12px; color: var(--color-text-secondary); }
-.table-scroll { flex: 1; overflow: auto; background: var(--color-bg-primary); min-height: 0; }
-.alert-banner { background: #FDECEA; border: 1px solid var(--color-error); color: var(--color-error); padding: 6px 10px; border-radius: 2px; margin-bottom: 6px; font-size: 13px; flex-shrink: 0; }
-.empty-state { text-align: center; color: var(--color-text-secondary); padding: 16px; }
-.num { text-align: left; direction: ltr; }
-.text-danger { color: var(--color-error); font-weight: bold; }
-.text-warning { color: var(--color-warning); font-weight: bold; }
-.totals-row td { background: var(--color-primary-light, #eef4fb) !important; border-top: 2px solid var(--color-primary); font-weight: bold; }
-.icon-btn { padding: 0 6px; }
-.btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px; }
-.btn-primary { background: var(--color-primary); color: #fff; }
-.btn-secondary { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); }
-.btn-danger { background: var(--color-error); color: #fff; }
-.input-field { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 3px; font-size: 13px; background: #fff; }
-.input-field.search { width: 220px; }
-.status-chip { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
-.status-chip.ok { background: #e6f4ea; color: #1b5e20; }
-.status-chip.near { background: #fff4e0; color: #e65100; }
-.status-chip.expired { background: #fdeaea; color: #b71c1c; }
-.status-chip.quar { background: #eee; color: #555; }
-@media (max-width: 768px) { .screen-toolbar { flex-direction: column; align-items: stretch; } .input-field.search { width: 100%; } }
+.page-screen { padding: 24px; display: flex; flex-direction: column; gap: 14px; overflow: auto; flex: 1; }
+.page-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.page-title h1 { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+.page-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+.search-box { margin-right: auto; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+.search-icon { font-size: 12px; }
+.search-input { border: none; outline: none; background: transparent; font-size: 13px; width: 220px; font-family: inherit; }
+
+.controls-row { display: flex; align-items: center; gap: 10px; }
+.segmented { display: flex; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #f1f5f9; height: 36px; }
+.seg { padding: 0 16px; border: none; background: transparent; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.seg.active { background: #2563eb; color: #fff; }
+.seg:hover:not(.active) { background: #e2e8f0; }
+
+.alert-banner { display: flex; align-items: center; gap: 8px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+.alert-icon { font-size: 15px; }
+
+.num-cell { text-align: left; direction: ltr; font-variant-numeric: tabular-nums; }
+.code-cell { direction: ltr; font-family: monospace; font-size: 12px; }
+.mono { font-family: monospace; font-size: 12px; direction: ltr; }
+.text-danger { color: #b91c1c; font-weight: 700; }
+.text-warning { color: #ea580c; font-weight: 700; }
+
+.table-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); overflow: auto; flex: 1; min-height: 0; }
+.bolt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bolt-table thead th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; }
+.bolt-table tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.bolt-table tbody tr:hover td { background: #f8fafc; }
+.totals-row td { background: #f8fafc !important; font-weight: 700; border-top: 2px solid #e2e8f0; color: #0f172a; }
+.empty-row td { padding: 48px 24px !important; border-bottom: none; }
+.empty-box { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #94a3b8; }
+.empty-icon { font-size: 40px; }
+.empty-title { font-size: 15px; font-weight: 700; color: #475569; }
+.empty-hint { font-size: 12px; }
+
+.act { height: 30px; width: 32px; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+.act:hover { background: #eff6ff; border-color: #2563eb; }
+.status-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.status-pill.ok { background: #f0fdf4; color: #15803d; }
+.status-pill.near { background: #fff7ed; color: #ea580c; }
+.status-pill.expired { background: #fef2f2; color: #b91c1c; }
+.status-pill.quar { background: #f1f5f9; color: #64748b; }
+
+@media (max-width: 768px) {
+  .page-screen { padding: 16px; }
+  .search-box { width: 100%; }
+  .search-input { flex: 1; width: auto; }
+  .seg { padding: 0 10px; font-size: 12px; }
+  .bolt-table { min-width: 980px; }
+}
 </style>

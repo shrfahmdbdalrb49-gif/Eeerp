@@ -1,298 +1,266 @@
 <template>
   <!--
-    شاشة فواتير المشتريات — تصميم ERP مكتبي كلاسيكي
-    التركيب: شريط أدوات (F) → رأس المستند (حقل مجمّعة) → جدول البنود → الإجماليات → شريط أوامر
+    شاشة فواتير المشتريات — نمط bolt.host (بطاقات بيضاء على خلفية رمادية فاتحة)
+    مع الحفاظ الكامل على المنطق: حالات draft/received/posted، addBatch، قيد مزدوج، إلغاء يعكس الحركات
   -->
-  <div class="purchases-screen" tabindex="0">
-    <div v-if="!editing" class="doc-shell">
-      <!-- ===== شريط الأدوات ===== -->
-      <div class="doc-toolbar">
-        <button class="tool-f primary" title="فاتورة جديدة (F2)" @click="openNewInvoice">
-          <span class="fkey">F2</span> جديد
-        </button>
-        <div class="toolbar-sep"></div>
-        <button class="tool-f" title="بحث (F3)" @click="focusSearch">
-          <span class="fkey">F3</span> بحث
-        </button>
-        <button class="tool-f" title="طباعة (F7)" @click="printList">
-          <span class="fkey">F7</span> طباعة
-        </button>
-        <div class="toolbar-sep"></div>
-        <button class="tool-f" title="مسح الفلاتر" @click="filters = { supplierId: null, status: '', dateFrom: '', dateTo: '' }">
-          <span class="fkey">F4</span> مسح
-        </button>
-        <span class="toolbar-spacer"></span>
-        <span class="toolbar-subtitle">إجمالي الفواتير: <b>{{ fmt(kpi.total) }}</b> — عدد: <b>{{ kpi.count }}</b> — المُرحَّل: <b>{{ fmt(kpi.postedTotal) }}</b> — قيد الاستلام: <b>{{ kpi.draftCount }}</b></span>
-      </div>
-
-      <!-- ===== رأس المستند (فلاتر مركّزة في إطار واحد) ===== -->
-      <div class="doc-header">
-        <div class="field-group">
-          <span class="field-group-title">بيانات الفاتورة</span>
-          <div class="field">
-            <label>الفرع</label>
-            <input type="text" class="input-field" value="الفرع الرئيسي" readonly />
+  <div class="purchases-screen" tabindex="-1" @keydown="handleKeydown">
+    <!-- ==========================================================
+         قائمة فواتير المشتريات
+         ========================================================== -->
+    <template v-if="!editing">
+      <div class="page-screen">
+        <div class="page-header">
+          <div class="page-title">
+            <h1>فواتير المشتريات</h1>
+            <p class="page-subtitle">إدارة فواتير الشراء والاستلام والترحيل المحاسبي — العدد: {{ kpi.count }} · الإجمالي: {{ fmt(kpi.total) }}</p>
           </div>
-          <div class="field">
-            <label>المخزن</label>
-            <input type="text" class="input-field" value="المخزن الرئيسي" readonly />
-          </div>
-          <div class="field">
-            <label>العملة</label>
-            <input type="text" class="input-field" value="YER" readonly />
-          </div>
+          <button class="btn btn-primary btn-lg" @click="openNewInvoice">
+            <span>جديد</span><span class="btn-icon">+</span>
+          </button>
         </div>
-        <div class="field-group">
-          <span class="field-group-title">الفلترة</span>
-          <div class="field">
-            <label>المورد</label>
-            <select class="input-field" v-model.number="filters.supplierId">
+
+        <div class="filter-row">
+          <div v-for="st in statusChips" :key="st.value"
+               class="filter-chip" :class="{ active: filters.status === st.value }"
+               @click="filters.status = filters.status === st.value ? '' : st.value">
+            <span>{{ st.label }}</span>
+            <span class="chip-count">{{ invoices.filter(i => i.status === st.value).length }}</span>
+          </div>
+          <div class="filter-chip" style="min-width:180px">
+            <select class="chip-select" v-model.number="filters.supplierId">
               <option :value="null">كل الموردين</option>
               <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
-          <div class="field">
-            <label>الحالة</label>
-            <select class="input-field" v-model="filters.status">
-              <option value="">كل الحالات</option>
-              <option value="draft">مسودة</option>
-              <option value="received">مستلمة</option>
-              <option value="posted">مرحّلة</option>
-              <option value="cancelled">ملغاة</option>
-            </select>
+          <div class="filter-chip" style="gap:6px">
+            <input type="date" class="chip-date" v-model="filters.dateFrom" title="من" />
+            <span style="color:#94a3b8">—</span>
+            <input type="date" class="chip-date" v-model="filters.dateTo" title="إلى" />
           </div>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input v-model="searchText" class="search-input" placeholder="ابحث برقم الفاتورة أو المورد..." @keydown.enter="applySearch" />
+            <button class="search-go" @click="applySearch">انتقال</button>
+          </div>
+          <button v-if="hasFilters" class="btn btn-ghost btn-sm" @click="filters = { supplierId: null, status: '', dateFrom: '', dateTo: '' }; searchText = ''">✕ مسح الفلاتر</button>
         </div>
-        <div class="field-group">
-          <span class="field-group-title">الفترة</span>
-          <div class="field">
-            <label>من</label>
-            <input type="date" class="input-field" v-model="filters.dateFrom" />
-            <button class="field-btn" title="من اليوم">⊿</button>
-          </div>
-          <div class="field">
-            <label>إلى</label>
-            <input type="date" class="input-field" v-model="filters.dateTo" />
-            <button class="field-btn" title="حتى اليوم">⊿</button>
-          </div>
-          <div class="field">
-            <label>بحث</label>
-            <input type="text" class="input-field" v-model="searchText" placeholder="رقم أو مورد..." @input="applySearch" />
-            <button class="field-btn" @click="applySearch">…</button>
-          </div>
-        </div>
-      </div>
 
-      <!-- ===== الجدول ===== -->
-      <div class="doc-details">
-        <table class="classic-grid">
-          <thead>
-            <tr>
-              <th class="row-num">#</th>
-              <th style="width:90px">رقم الفاتورة</th><th style="width:84px">التاريخ</th><th>المورد</th>
-              <th style="width:56px">البنود</th><th style="width:64px">الكمية</th><th style="width:96px">الإجمالي</th>
-              <th style="width:76px">الدفع</th><th style="width:76px">الحالة</th><th style="width:150px">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(inv, idx) in visibleInvoices" :key="inv.id" @click="selectedRow = inv.id">
-              <td class="row-num">{{ idx + 1 }}</td>
-              <td class="mono">{{ inv.invoice_no }}</td>
-              <td>{{ inv.date }}</td>
-              <td style="font-weight:bold">{{ supplierName(inv.supplierId) }}</td>
-              <td class="num-cell">{{ inv.linesCount }}</td>
-              <td class="num-cell">{{ fmt(inv.totalQty) }}</td>
-              <td class="num-cell"><b>{{ fmt(inv.total) }}</b></td>
-              <td>{{ payLabel(inv.paymentType) }}</td>
-              <td><span :class="'status-badge ' + inv.status">{{ statusLabel(inv.status) }}</span></td>
-              <td class="row-actions">
-                <button class="act-btn" title="عرض (F4)" @click="viewInvoice(inv)">عرض</button>
-                <button v-if="inv.status === 'draft'" class="act-btn act-receive" title="استلام (F8)" @click="receiveInvoice(inv)">استلام</button>
-                <button v-if="inv.status === 'received'" class="act-btn act-post" title="ترحيل" @click="postInvoice(inv)">ترحيل</button>
-                <button v-if="inv.status === 'received'" class="act-btn" title="إلغاء الاستلام" @click="unreceiveInvoice(inv)">↺استلام</button>
-                <button v-if="inv.status === 'posted'" class="act-btn" title="طباعة" @click="viewInvoice(inv, true)">طباعة</button>
-                <button v-if="!['cancelled', 'posted'].includes(inv.status)" class="act-btn act-cancel" title="إلغاء" @click="deleteInvoice(inv)">إلغاء</button>
-              </td>
-            </tr>
-            <tr v-if="visibleInvoices.length === 0">
-              <td colspan="10" class="empty-row">لا توجد فواتير شراء{{ filters.status || filters.supplierId != null || searchText ? ' مطابقة للفلترة' : '' }} — اضغط F2 لإنشاء فاتورة جديدة</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- ===== شريط الأوامر السفلي ===== -->
-      <div class="doc-commandbar">
-        <span class="cmd-hint">F2 جديد · F3 بحث · F4 عرض/تعديل · F7 طباعة · Esc إغلاق</span>
-      </div>
-    </div>
-
-    <!-- =============================================================
-         نافذة إنشاء/تحرير فاتورة الشراء — بنفس التركيب الكلاسيكي
-         ============================================================= -->
-    <div v-if="editing" class="doc-shell edit-shell">
-      <div class="doc-toolbar">
-        <button class="tool-f primary" title="حفظ كمسودة (F8)" @click="saveInvoice(false)">
-          <span class="fkey">F8</span> حفظ مسودة
-        </button>
-        <button class="tool-f primary" title="استلام وترحيل (F10)" @click="saveInvoice(true)">
-          <span class="fkey">F10</span> استلام وترحيل
-        </button>
-        <div class="toolbar-sep"></div>
-        <button class="tool-f" title="رجوع (Esc)" @click="closeForm">
-          <span class="fkey">Esc</span> رجوع
-        </button>
-        <span class="toolbar-spacer"></span>
-        <span v-if="formStatusMsg" :class="'cmd-hint ' + formStatusClass">{{ formStatusMsg }}</span>
-      </div>
-
-      <!-- ===== رأس المستند ===== -->
-      <div class="doc-header">
-        <div class="field-group">
-          <span class="field-group-title">بيانات الفاتورة</span>
-          <div class="field">
-            <label>رقم</label>
-            <input type="text" class="input-field" value="جديدة" readonly />
-          </div>
-          <div class="field">
-            <label>التاريخ</label>
-            <input type="date" class="input-field" v-model="form.date" />
-          </div>
-          <div class="field">
-            <label>الفرع</label>
-            <input type="text" class="input-field" value="الفرع الرئيسي" readonly />
-          </div>
-        </div>
-        <div class="field-group">
-          <span class="field-group-title">المورد والدفع</span>
-          <div class="field">
-            <label>المورد</label>
-            <select class="input-field" v-model.number="form.supplierId">
-              <option :value="null" disabled>اختر موردًا</option>
-              <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <button class="field-btn" title="بحث عن مورد (F5)" @click="focusSupplier">…</button>
-          </div>
-          <div class="field">
-            <label>المخزن</label>
-            <input type="text" class="input-field" value="المخزن الرئيسي" readonly />
-          </div>
-          <div class="field">
-            <label>طريقة الدفع</label>
-            <select class="input-field" v-model="form.paymentType">
-              <option value="credit">آجل (ذمم دائنة)</option>
-              <option value="cash">نقدي (الصندوق)</option>
-              <option value="bank">تحويل بنكي</option>
-            </select>
-          </div>
-        </div>
-        <div class="field-group">
-          <span class="field-group-title">أخرى</span>
-          <div class="field">
-            <label>العملة</label>
-            <input type="text" class="input-field" value="YER" readonly />
-          </div>
-          <div class="field">
-            <label>سعر الصرف</label>
-            <input type="number" class="input-field" value="1" readonly />
-          </div>
-          <div class="field">
-            <label>مرجع</label>
-            <input type="text" class="input-field" v-model="form.notes" placeholder="رقم فاتورة المورد / ملاحظات" />
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== جدول البنود (الإدخال داخل الجدول مباشرة) ===== -->
-      <div class="doc-details">
-        <table class="classic-grid lines-grid">
-          <thead>
-            <tr>
-              <th class="row-num">#</th>
-              <th style="width:72px">كود</th><th style="width:76px">الباركود</th><th style="width:210px">اسم الصنف</th>
-              <th style="width:46px">الوحدة</th><th style="width:66px">التشغيلة</th>
-              <th style="width:76px">ت.الإنتاج</th><th style="width:76px">ت.الانتهاء</th>
-              <th style="width:52px">الكمية</th><th style="width:52px">البونص</th>
-              <th style="width:76px">سعر الشراء</th><th style="width:56px">الخصم</th><th style="width:56px">الضريبة</th>
-              <th style="width:84px">الإجمالي</th><th style="width:30px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(l, i) in form.lines" :key="i">
-              <td class="row-num">{{ i + 1 }}</td>
-              <td class="num-cell">{{ itemOf(l.itemId)?.code || '' }}</td>
-              <td class="num-cell">{{ itemOf(l.itemId)?.barcode || '' }}</td>
-              <td>
-                <select class="input-field" v-model.number="l.itemId" @change="onItemSelect(i)" ref="itemSelects">
-                  <option :value="null" disabled>اختر صنفًا</option>
-                  <option v-for="it in items" :key="it.id" :value="it.id">{{ it.name }}</option>
-                </select>
-              </td>
-              <td>{{ unitLabel(itemOf(l.itemId)?.unit) }}</td>
-              <td class="num-cell">{{ l.batchNo || '' }}</td>
-              <td><input type="date" class="input-field" v-model="l.mfgDate" /></td>
-              <td><input type="date" class="input-field" v-model="l.expDate" /></td>
-              <td class="num-cell"><input type="number" class="input-field" v-model.number="l.qty" min="1" /></td>
-              <td class="num-cell"><input type="number" class="input-field" v-model.number="l.bonus" min="0" /></td>
-              <td class="num-cell"><input type="number" class="input-field" v-model.number="l.cost" min="0" step="0.01" /></td>
-              <td class="num-cell"><input type="number" class="input-field" v-model.number="l.discount" min="0" step="0.01" /></td>
-              <td class="num-cell"><input type="number" class="input-field" v-model.number="l.tax" min="0" step="0.01" /></td>
-              <td class="num-cell row-total">{{ fmt(lineTotal(l)) }}</td>
-              <td><button class="delete-btn" type="button" @click="removeLine(i)" :disabled="form.lines.length <= 1">✕</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- ===== الإجماليات السفلية ===== -->
-      <div class="doc-totals">
-        <div class="total-cell"><span class="t-label">قبل الخصم:</span><span class="t-value">{{ fmt(preDiscountTotal) }}</span></div>
-        <div class="total-cell"><span class="t-label">الخصم:</span><span class="t-value">{{ fmt(totalDiscount) }}</span></div>
-        <div class="total-cell"><span class="t-label">الضريبة:</span><span class="t-value">{{ fmt(totalTax) }}</span></div>
-        <div class="total-cell"><span class="t-label">المصاريف:</span><span class="t-value">{{ fmt(expenses) }}</span></div>
-        <div class="total-cell net"><span class="t-label">الصافي:</span><span class="t-value">{{ fmt(netTotal) }}</span></div>
-        <div class="total-cell"><span class="t-label">المدفوع:</span><span class="t-value">{{ fmt(paidAmount) }}</span></div>
-        <div class="total-cell"><span class="t-label">المتبقي:</span><span class="t-value">{{ fmt(remaining) }}</span></div>
-      </div>
-
-      <!-- ===== شريط الأوامر السفلي ===== -->
-      <div class="doc-commandbar">
-        <span v-if="formError" class="cmd-error">{{ formError }}</span>
-        <span v-else class="cmd-hint">F8 حفظ مسودة · F10 استلام وترحيل · Esc رجوع — الإجماليات تُحتسب تلقائيًا</span>
-      </div>
-    </div>
-
-    <!-- ===== نافذة عرض الفاتورة / الطباعة ===== -->
-    <div v-if="showView" class="form-modal-overlay" @click.self="showView = false">
-      <div class="form-modal" :class="{ 'print-area': printOnly }">
-        <div class="modal-title print-hide">
-          <span>فاتورة الشراء {{ viewed?.invoice_no }}</span>
-          <button class="close-btn" @click="showView = false">✕</button>
-        </div>
-        <div class="modal-body invoice-view" v-if="viewed">
-          <div class="invoice-head">
-            <div class="inv-co"><b>صيدلية شرف</b><div class="inv-co-sub">Sharaf Pharmacy ERP</div></div>
-            <div class="inv-meta">
-              <div>رقم الفاتورة: <b>{{ viewed.invoice_no }}</b></div>
-              <div>التاريخ: {{ viewed.date }}</div>
-              <div>المورد: {{ supplierName(viewed.supplierId) }}</div>
-              <div>الحالة: <span :class="'status-badge ' + viewed.status">{{ statusLabel(viewed.status) }}</span></div>
-            </div>
-          </div>
-          <table class="lines-table view-lines">
-            <thead><tr><th>#</th><th>الصنف</th><th style="width:70px">الكمية</th><th style="width:46px">البونص</th><th style="width:100px">التكلفة</th><th style="width:100px">الإجمالي</th><th style="width:110px">انتهاء الصلاحية</th></tr></thead>
+        <div class="table-card">
+          <table class="bolt-table">
+            <thead>
+              <tr>
+                <th style="width:110px">رقم الفاتورة</th>
+                <th style="width:100px">التاريخ</th>
+                <th>المورد</th>
+                <th style="width:90px">البنود</th>
+                <th style="width:80px">الكمية</th>
+                <th style="width:90px">نوع الدفع</th>
+                <th style="width:80px; text-align:left">الإجمالي</th>
+                <th style="width:90px">الحالة</th>
+                <th style="width:220px">إجراءات</th>
+              </tr>
+            </thead>
             <tbody>
-              <tr v-for="(l, i) in viewedLines" :key="l.id || i">
-                <td class="num">{{ i + 1 }}</td><td>{{ viewedItems[l.itemId]?.name || l.item_name || '—' }}</td>
-                <td class="num">{{ l.qty }}{{ l.bonus ? '+' + l.bonus : '' }}</td><td class="num">{{ l.bonus || 0 }}</td><td class="num">{{ fmt(l.unit_cost) }}</td>
-                <td class="num">{{ fmt(l.subtotal) }}</td><td>{{ l.expiry_date ? String(l.expiry_date).slice(0, 10) : '—' }}</td>
+              <tr v-for="inv in visibleInvoices" :key="inv.id"
+                  :class="{ selected: selectedRow === inv.id }"
+                  @click="selectedRow = inv.id">
+                <td><span class="link-cell">{{ inv.invoice_no }}</span></td>
+                <td>{{ inv.date }}</td>
+                <td>{{ supplierName(inv.supplierId) }}</td>
+                <td>{{ inv.linesCount }}</td>
+                <td class="num-cell">{{ fmt(inv.totalQty) }}</td>
+                <td>{{ payLabel(inv.paymentType) }}</td>
+                <td class="num-cell"><b>{{ fmt(inv.total) }}</b></td>
+                <td>
+                  <span class="status-dot" :class="inv.status"></span>
+                  <span class="status-name" :class="inv.status">{{ statusLabel(inv.status) }}</span>
+                </td>
+                <td class="action-cells">
+                  <button class="act" title="عرض" @click.stop="viewInvoice(inv)">👁</button>
+                  <button v-if="inv.status === 'draft'" class="act" title="استلام — يزيد المخزون فعليًا" @click.stop="receiveInvoice(inv)">📥 استلام</button>
+                  <button v-if="inv.status === 'received'" class="act ok" title="ترحيل محاسبي — ينشئ قيد مزدوج" @click.stop="postInvoice(inv)">✔ ترحيل</button>
+                  <button v-if="inv.status === 'received'" class="act danger" title="إلغاء الاستلام — يخصم المخزون" @click.stop="unreceiveInvoice(inv)">↺</button>
+                  <button v-if="inv.status === 'posted'" class="act" title="طباعة" @click.stop="viewInvoice(inv, true)">🖨</button>
+                  <button v-if="canCancel(inv)" class="act danger" title="إلغاء — يعكس المخزون والقيود" @click.stop="deleteInvoice(inv)">✕</button>
+                </td>
+              </tr>
+              <tr v-if="visibleInvoices.length === 0">
+                <td colspan="9" class="empty-row">
+                  <div class="empty-box">
+                    <span class="empty-icon">🛒</span>
+                    <p class="empty-title">{{ hasFilters ? 'لا توجد فواتير مطابقة للفلترة' : 'لا توجد فواتير شراء بعد' }}</p>
+                    <p class="empty-hint">اضغط زر «جديد» لإنشاء فاتورة شراء — الاستلام يزيد المخزون والتسجيل بقيد مزدوج</p>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
-          <div class="invoice-total">الإجمالي: <b>{{ fmt(viewedTotal) }}</b></div>
         </div>
-        <div class="form-actions print-hide">
+      </div>
+    </template>
+
+    <!-- ==========================================================
+         نموذج فاتورة الشراء
+         ========================================================== -->
+    <template v-else>
+      <div class="form-screen">
+        <!-- بطاقة الرأس -->
+        <div class="form-header-card">
+          <div class="form-card-title">
+            <span>فاتورة مشتريات جديدة</span>
+            <button class="close-btn" @click="closeForm">✕</button>
+          </div>
+          <div class="form-fields">
+            <div class="field-card">
+              <label>رقم الفاتورة</label>
+              <input class="fi" :value="'P-' + new Date(form.date).getFullYear().toString().slice(-2) + '-****'" readonly />
+            </div>
+            <div class="field-card">
+              <label>التاريخ</label>
+              <input type="date" class="fi" v-model="form.date" />
+            </div>
+            <div class="field-card" style="flex:1.2">
+              <label>المورد *</label>
+              <select class="fi" v-model.number="form.supplierId" @change="focusSupplier">
+                <option :value="null" disabled>— اختر مورد —</option>
+                <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+            </div>
+            <div class="field-card">
+              <label>طريقة الدفع</label>
+              <div class="toggle-group">
+                <button type="button" class="toggle" :class="{ on: form.paymentType === 'credit' }" @click="form.paymentType = 'credit'">آجل</button>
+                <button type="button" class="toggle" :class="{ on: form.paymentType === 'cash' }" @click="form.paymentType = 'cash'">نقدي</button>
+                <button type="button" class="toggle" :class="{ on: form.paymentType === 'bank' }" @click="form.paymentType = 'bank'">بنكي</button>
+              </div>
+            </div>
+          </div>
+          <div class="barcode-strip">
+            <div class="field-card" style="flex:1.4; margin:0">
+              <label>البحث السريع عن صنف</label>
+              <input class="fi" v-model="quickItem" placeholder="ابدأ بالكتابة لإضافة صنف..." list="quick-items" @keydown.enter="addQuickItem" />
+              <datalist id="quick-items">
+                <option v-for="it in items" :key="it.id" :value="it.name"></option>
+              </datalist>
+            </div>
+            <button class="btn btn-primary" @click="addQuickItem" :disabled="!quickItem.trim()">➕ إضافة صنف</button>
+          </div>
+        </div>
+
+        <!-- بطاقة البنود -->
+        <div class="form-card">
+          <div class="form-card-title" style="border-bottom:none; padding-bottom:0">
+            <span>بنود الفاتورة</span>
+            <button class="btn btn-ghost btn-sm" @click="addLine">+ إضافة بند</button>
+          </div>
+          <table class="lines-table" v-if="form.lines.length > 0">
+            <thead>
+              <tr>
+                <th style="width:22%">الصنف</th>
+                <th style="width:9%">الكمية</th>
+                <th style="width:8%">البونص</th>
+                <th style="width:11%">سعر الشراء</th>
+                <th style="width:8%">خصم</th>
+                <th style="width:8%">ضريبة</th>
+                <th style="width:11%; text-align:left">الإجمالي</th>
+                <th style="width:11%">ت.الانتهاء</th>
+                <th style="width:42px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(l, i) in form.lines" :key="i">
+                <td>
+                  <select class="li" v-model.number="l.itemId" @change="onItemSelect(i)">
+                    <option :value="null" disabled>— اختر صنف —</option>
+                    <option v-for="it in items" :key="it.id" :value="it.id">{{ it.name }} ({{ unitLabel(it.unit) }})</option>
+                  </select>
+                </td>
+                <td><input type="number" min="1" step="1" class="li" v-model.number="l.qty" /></td>
+                <td><input type="number" min="0" step="1" class="li" v-model.number="l.bonus" /></td>
+                <td><input type="number" min="0" step="0.01" class="li" v-model.number="l.cost" /></td>
+                <td><input type="number" min="0" step="0.01" class="li" v-model.number="l.discount" /></td>
+                <td><input type="number" min="0" step="0.01" class="li" v-model.number="l.tax" /></td>
+                <td class="num-cell row-total">{{ fmt(lineTotal(l)) }}</td>
+                <td><input type="date" class="li" v-model="l.expDate" /></td>
+                <td><button class="delete-btn" @click="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف البند">🗑</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="lines-empty">
+            <span class="empty-icon">📦</span>
+            <p class="empty-title">لا توجد بنود في الفاتورة</p>
+            <p class="empty-hint">استخدم البحث السريع أو زر إضافة بند لإضافة الأصناف</p>
+          </div>
+        </div>
+
+        <!-- الملخص + الملاحظات -->
+        <div class="form-bottom">
+          <div class="totals-card">
+            <div class="total-row"><span>المجموع قبل الخصم</span><span class="t-num">{{ fmt(preDiscountTotal) }} <span class="cur">ري</span></span></div>
+            <div class="total-row"><span>إجمالي الخصم</span><span class="t-num">−{{ fmt(totalDiscount) }} <span class="cur">ري</span></span></div>
+            <div class="total-row"><span>إجمالي الضريبة</span><span class="t-num">+{{ fmt(totalTax) }} <span class="cur">ري</span></span></div>
+            <div class="total-row net"><span>الإجمالي النهائي</span><span class="t-num">{{ fmt(netTotal) }} <span class="cur">ري</span></span></div>
+            <div class="total-row" v-if="form.paymentType === 'credit'"><span>المتبقي (ذمم المورد)</span><span class="t-num remaining">{{ fmt(remaining) }} <span class="cur">ري</span></span></div>
+          </div>
+          <div class="notes-card">
+            <label>ملاحظات إضافية</label>
+            <textarea class="notes-area" v-model="form.notes" placeholder="رقم فاتورة المورد / ملاحظات..."></textarea>
+          </div>
+        </div>
+
+        <div v-if="formError" class="form-msg form-msg-error">{{ formError }}</div>
+        <div v-if="formStatusMsg" class="form-msg" :class="formStatusClass === 'cmd-error' ? 'form-msg-error' : 'form-msg-ok'">{{ formStatusMsg }}</div>
+
+        <div class="form-actions-row">
+          <button class="btn btn-outline" @click="closeForm">✕ إلغاء</button>
+          <button class="btn btn-outline" @click="saveInvoice(false)" :disabled="saving">💾 حفظ كمسودة</button>
+          <button class="btn btn-primary" @click="saveInvoice(true)" :disabled="saving">
+            <span v-if="saving" class="spin">⏳</span>
+            <span>استلام وترحيل</span>
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ==========================================================
+         عرض / طباعة الفاتورة
+         ========================================================== -->
+    <div v-if="showView" class="form-modal-overlay" @click.self="showView = false">
+      <div class="print-area" :class="{ 'print-area-only': printOnly }">
+        <div class="form-card-title print-hide">
+          <span>فاتورة الشراء {{ viewed?.invoice_no }}</span>
+          <button class="close-btn" @click="showView = false">✕</button>
+        </div>
+        <div class="invoice-head" v-if="viewed">
+          <div class="inv-co">
+            <div class="inv-co-name">نظام شرف — SHARAF ERP</div>
+            <div class="inv-co-sub">محاسبة ومخازن ومشتريات</div>
+          </div>
+          <div class="inv-meta">
+            <div><strong>رقم الفاتورة: {{ viewed.invoice_no }}</strong></div>
+            <div>التاريخ: {{ viewed.date }}</div>
+            <div>المورد: {{ supplierName(viewed.supplierId) }}</div>
+            <div>الحالة: <span class="status-name" :class="viewed.status">{{ statusLabel(viewed.status) }}</span></div>
+          </div>
+        </div>
+        <table class="lines-table" style="border:1px solid #e2e8f0">
+          <thead><tr><th>#</th><th>الصنف</th><th style="text-align:left">الكمية</th><th style="text-align:left">البونص</th><th style="text-align:left">التكلفة</th><th style="text-align:left">الإجمالي</th><th>انتهاء الصلاحية</th></tr></thead>
+          <tbody>
+            <tr v-for="(l, i) in viewedLines" :key="l.id || i">
+              <td style="width:40px" class="num-cell">{{ i + 1 }}</td>
+              <td>{{ viewedItems[l.itemId]?.name || l.item_name || '—' }}</td>
+              <td class="num-cell">{{ l.qty }}{{ l.bonus ? '+' + l.bonus : '' }}</td>
+              <td class="num-cell">{{ l.bonus || 0 }}</td>
+              <td class="num-cell">{{ fmt(l.unit_cost) }}</td>
+              <td class="num-cell">{{ fmt(l.subtotal) }}</td>
+              <td>{{ l.expiry_date ? String(l.expiry_date).slice(0, 10) : '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="invoice-total">الإجمالي: <strong>{{ fmt(viewedTotal) }} ري</strong></div>
+        <div class="print-actions print-hide">
           <button class="btn btn-primary" @click="doPrint">🖨 طباعة</button>
-          <button class="btn btn-secondary" @click="showView = false">إغلاق</button>
+          <button class="btn btn-outline" @click="showView = false">إغلاق</button>
         </div>
       </div>
     </div>
@@ -316,6 +284,7 @@ const suppliers = ref([])
 const items = ref([])
 const filters = ref({ supplierId: null, status: '', dateFrom: '', dateTo: '' })
 const searchText = ref('')
+const quickItem = ref('')
 const selectedRow = ref(null)
 const editing = ref(false)
 const saving = ref(false)
@@ -336,6 +305,16 @@ function unitLabel(u) { return { box: 'علبة', strip: 'شريط', tab: 'قر�
 function payLabel(t) { return { cash: 'نقدي', bank: 'بنكي', credit: 'آجل' }[t] || t }
 function statusLabel(s) { return { draft: 'مسودة', received: 'مستلمة', posted: 'مرحّلة', cancelled: 'ملغاة' }[s] || s }
 
+const statusChips = [
+  { value: '', label: 'الكل' },
+  { value: 'draft', label: 'مسودة' },
+  { value: 'received', label: 'مستلمة' },
+  { value: 'posted', label: 'مرحّلة' },
+  { value: 'cancelled', label: 'ملغاة' },
+]
+
+const hasFilters = computed(() => !!(filters.value.status || filters.value.supplierId != null || filters.value.dateFrom || filters.value.dateTo || searchText.value.trim()))
+
 function lineTotal(l) {
   const qty = Number(l.qty || 0) + Number(l.bonus || 0)
   const disc = Number(l.discount || 0)
@@ -351,6 +330,8 @@ const paidAmount = computed(() => form.value.paymentType === 'credit' ? 0 : netT
 const remaining = computed(() => Math.max(0, netTotal.value - paidAmount.value))
 
 const viewedTotal = computed(() => viewedLines.value.reduce((s, l) => s + Number(l.subtotal || 0), 0))
+const viewedItemsMap = computed(() => Object.fromEntries(items.value.map(i => [i.id, i])))
+function viewedItems(id) { return viewedItemsMap.value[id] }
 
 const kpi = computed(() => {
   const active = invoices.value.filter(i => i.status !== 'cancelled')
@@ -431,10 +412,20 @@ function onItemSelect(i) {
   if (it) form.value.lines[i].cost = it.cost || it.purchasePrice || 0
 }
 function focusSupplier() { /* البحث عن مورد عبر فلاتر رأس المستند */ }
+function addQuickItem() {
+  const term = quickItem.value.trim()
+  if (!term) return
+  const found = items.value.find(it => it.name.toLowerCase().includes(term.toLowerCase()))
+  if (found) {
+    form.value.lines.push({ itemId: found.id, qty: 1, cost: found.cost || found.purchasePrice || 0, bonus: 0, discount: 0, tax: 0, mfgDate: '', expDate: '', batchNo: '' })
+  }
+  quickItem.value = ''
+}
 
 function openNewInvoice() {
   formError.value = ''
   flash('')
+  quickItem.value = ''
   form.value = { supplierId: null, date: new Date().toISOString().slice(0, 10), paymentType: 'credit', notes: '', lines: [{ itemId: null, qty: 1, cost: 0, bonus: 0, discount: 0, tax: 0, mfgDate: '', expDate: '', batchNo: '' }] }
   editing.value = true
   showView.value = false
@@ -633,41 +624,142 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.purchases-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; outline: none; }
+/* ============================================
+   نمط bolt.host — بطاقات بيضاء على خلفية رمادية فاتحة
+   ============================================ */
+.purchases-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; outline: none; overflow: auto; }
 .mono { font-family: monospace; font-size: 12px; }
-.num { text-align: left; direction: ltr; }
-.status-badge { padding: 1px 6px; border-radius: 1px; font-size: 11px; font-weight: bold; white-space: nowrap; border: 1px solid transparent; }
-.status-badge.draft { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
-.status-badge.received { background: #e3f0ff; color: #0d5aa7; border-color: #9ec2ef; }
-.status-badge.posted { background: #e6f4ea; color: #1b5e20; border-color: #a5d6b0; }
-.status-badge.cancelled { background: #fdeaea; color: #b71c1c; border-color: #f0bcbc; }
-.row-actions { display: flex; gap: 2px; }
-.act-btn { height: 20px; padding: 0 6px; border: 1px solid #b9c2cc; border-radius: 1px; background: #fff; cursor: pointer; font-size: 11px; white-space: nowrap; }
-.act-btn:hover { background: #e3ecf7; border-color: #0d5aa7; }
-.act-receive { border-color: #9ec2ef; color: #0d5aa7; }
-.act-post { border-color: #a5d6b0; color: #1b5e20; }
-.act-cancel { border-color: #f0bcbc; color: #b71c1c; background: #fdf2f2; }
-.delete-btn { background: #fdeaea; color: #b71c1c; border: 1px solid #f0bcbc; border-radius: 1px; width: 22px; height: 20px; cursor: pointer; font-size: 10px; }
+.num-cell { text-align: left; direction: ltr; font-variant-numeric: tabular-nums; }
+.link-cell { color: #2563eb; font-weight: 600; cursor: pointer; text-decoration: none; }
+
+/* ---------- شاشة القائمة ---------- */
+.page-screen { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; }
+.page-title h1 { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+.page-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-chip { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 13px; color: #475569; cursor: pointer; transition: all 0.15s; }
+.filter-chip:hover { border-color: #2563eb; color: #2563eb; }
+.filter-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+.chip-count { font-size: 11px; opacity: 0.75; background: rgba(0,0,0,0.08); border-radius: 999px; padding: 0 6px; min-width: 20px; text-align: center; }
+.filter-chip.active .chip-count { background: rgba(255,255,255,0.25); }
+.chip-select { border: none; outline: none; background: transparent; font-size: 13px; font-family: inherit; color: #475569; cursor: pointer; width: 100%; }
+.chip-date { border: none; outline: none; background: transparent; font-size: 12px; font-family: inherit; color: #475569; width: 115px; }
+
+.search-box { margin-right: auto; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+.search-icon { font-size: 12px; }
+.search-input { border: none; outline: none; background: transparent; font-size: 13px; width: 200px; font-family: inherit; }
+.search-go { height: 24px; padding: 0 10px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+
+.table-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); overflow: hidden; }
+.bolt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bolt-table thead th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.bolt-table tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.bolt-table tbody tr:hover td { background: #f8fafc; }
+.bolt-table tbody tr.selected td { background: #eff6ff; }
+.bolt-table .row-total { font-weight: 700; color: #0f172a; }
+.empty-row td { padding: 48px 24px !important; border-bottom: none; }
+.empty-box { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #94a3b8; }
+.empty-icon { font-size: 40px; }
+.empty-title { font-size: 15px; font-weight: 700; color: #475569; }
+.empty-hint { font-size: 12px; }
+
+.action-cells { display: flex; gap: 4px; }
+.act { height: 28px; padding: 0 8px; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; }
+.act:hover { background: #eff6ff; border-color: #2563eb; }
+.act.ok { color: #15803d; }
+.act.ok:hover { background: #f0fdf4; border-color: #86efac; }
+.act.danger { color: #dc2626; }
+.act.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+
+/* ---------- نموذج الفاتورة ---------- */
+.form-screen { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 1100px; width: 100%; margin: 0 auto; }
+.form-header-card, .form-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); padding: 16px; }
+.form-header-card { background: #f8fafc; }
+.form-card-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 16px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+.close-btn { background: transparent; border: none; font-size: 14px; color: #64748b; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.close-btn:hover { background: #f1f5f9; color: #0f172a; }
+
+.form-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.field-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.field-card label { font-size: 11px; font-weight: 600; color: #64748b; }
+.fi { height: 32px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0 10px; font-size: 13px; font-family: inherit; color: #0f172a; background: #fff; outline: none; }
+.fi:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15); }
+.fi[readonly] { background: #f8fafc; color: #64748b; }
+
+.barcode-strip { display: flex; gap: 10px; margin-top: 12px; align-items: flex-end; }
+
+.toggle-group { display: flex; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #f1f5f9; height: 32px; }
+.toggle { flex: 1; border: none; background: transparent; font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer; font-family: inherit; padding: 0 12px; transition: all 0.15s; }
+.toggle.on { background: #2563eb; color: #fff; }
+.toggle:hover:not(.on) { background: #e2e8f0; }
+
+.lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lines-table th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; padding: 8px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; }
+.lines-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
+.li { height: 34px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0 10px; font-size: 13px; font-family: inherit; color: #0f172a; background: #fff; width: 100%; outline: none; }
+.li:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15); }
+.lines-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 32px; color: #94a3b8; }
+
+.form-bottom { display: flex; gap: 14px; align-items: stretch; }
+.totals-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 300px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
+.total-row { display: flex; justify-content: space-between; font-size: 13px; color: #475569; }
+.total-row .t-num { direction: ltr; text-align: left; font-variant-numeric: tabular-nums; }
+.total-row .cur { color: #94a3b8; font-size: 11px; margin-right: 2px; }
+.total-row.net { font-size: 16px; font-weight: 800; color: #2563eb; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 2px; }
+.total-row .remaining { color: #dc2626; }
+.notes-card { background: #fff; border: 1px dashed #cbd5e1; border-radius: 10px; padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.notes-card label { font-size: 11px; font-weight: 600; color: #64748b; }
+.notes-area { border: none; outline: none; resize: none; font-size: 13px; font-family: inherit; color: #334155; min-height: 64px; }
+
+.form-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.form-msg-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.form-msg-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+.form-actions-row { display: flex; gap: 10px; justify-content: center; padding-top: 4px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 18px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; }
+.btn-lg { height: 40px; padding: 0 20px; font-size: 14px; }
+.btn-sm { height: 30px; padding: 0 12px; font-size: 12px; }
+.btn-icon { font-size: 16px; line-height: 1; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline { background: #fff; color: #374151; border-color: #d1d5db; }
+.btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
+.btn-ghost { background: transparent; color: #2563eb; border-color: transparent; }
+.btn-ghost:hover { background: #eff6ff; }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.delete-btn { width: 28px; height: 28px; border: 1px solid #fecaca; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.delete-btn:hover { background: #fef2f2; }
 .delete-btn:disabled { opacity: 0.4; cursor: default; }
-.form-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px; }
-.form-modal { background: #fff; border: 1px solid #98a2b3; border-radius: 1px; width: 560px; max-width: 96vw; box-shadow: 2px 2px 8px rgba(0,0,0,0.25); max-height: 92vh; overflow: auto; }
-.modal-title { display: flex; justify-content: space-between; align-items: center; background: #0d5aa7; color: #fff; font-weight: bold; padding: 5px 12px; font-size: 13px; }
-.close-btn { background: transparent; border: none; color: #fff; cursor: pointer; }
-.modal-body { padding: 12px; }
-.lines-table { width: 100%; border-collapse: collapse; }
-.lines-table th, .lines-table td { border: 1px solid #c4ccd4; padding: 4px 6px; font-size: 12px; text-align: right; }
-.lines-table th { background: #e4e8ee; position: sticky; top: 0; }
-.num { text-align: left; direction: ltr; }
-.invoice-head { display: flex; justify-content: space-between; gap: 12px; border-bottom: 2px solid #0d5aa7; padding-bottom: 8px; margin-bottom: 8px; }
-.inv-co-sub { font-size: 11px; color: #667085; }
-.inv-meta div { font-size: 12px; margin: 2px 0; }
-.invoice-total { text-align: left; direction: ltr; margin-top: 8px; font-size: 14px; }
-.form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 12px; background: #f0f2f5; border-top: 1px solid #c4ccd4; }
-.btn { padding: 5px 12px; border: 1px solid #b9c2cc; border-radius: 2px; cursor: pointer; font-size: 12px; }
-.btn-primary { background: #0d5aa7; color: #fff; border-color: #0d5aa7; }
-.btn-secondary { background: #fff; }
+
+/* ---------- نافذة العرض/الطباعة ---------- */
+.form-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.print-area { background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; width: 620px; max-width: 96vw; box-shadow: 0 20px 40px rgba(0,0,0,0.25); max-height: 92vh; overflow: auto; padding: 24px; }
+.invoice-head { display: flex; justify-content: space-between; gap: 12px; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 12px; }
+.inv-co-name { font-size: 15px; font-weight: 800; color: #0f172a; }
+.inv-co-sub { font-size: 11px; color: #64748b; }
+.inv-meta div { font-size: 12px; margin: 3px 0; color: #475569; }
+.invoice-total { text-align: left; direction: ltr; margin-top: 12px; font-size: 15px; color: #0f172a; }
+.print-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 12px 0 0; border-top: 1px solid #e2e8f0; margin-top: 12px; }
+
+/* ---------- شارات الحالة ---------- */
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; margin-left: 6px; }
+.status-name { font-size: 12px; font-weight: 600; }
+.status-name.draft { color: #6b7280; }
+.status-dot.draft { background: #d1d5db; }
+.status-name.received { color: #2563eb; }
+.status-dot.received { background: #2563eb; }
+.status-name.posted { color: #15803d; }
+.status-dot.posted { background: #16a34a; }
+.status-name.cancelled { color: #dc2626; }
+.status-dot.cancelled { background: #ef4444; }
+
 @media print {
-  .doc-shell, .form-modal-overlay { display: none !important; }
+  .form-modal-overlay { display: none !important; }
   .print-area { display: block !important; border: none !important; box-shadow: none !important; width: 100% !important; max-width: 100% !important; max-height: none !important; position: static !important; }
   .print-hide { display: none !important; }
 }

@@ -1,87 +1,150 @@
 <template>
   <div class="items-screen">
-    <div class="screen-toolbar">
-      <button class="btn btn-primary" @click="openForm()">+ صنف جديد</button>
-      <input type="text" class="input-field search" placeholder="🔍 بحث بالاسم أو الكود أو الباركود..." v-model="search" />
-      <select class="input-field" v-model="stockFilter" style="width:140px">
-        <option value="">كل الأصناف</option>
-        <option value="low">رصيد منخفض</option>
-        <option value="out">نفذ من المخزون</option>
-      </select>
-      <span class="toolbar-spacer"></span>
-      <span class="toolbar-info">المخزون الحقيقي (FEFO): مجموع التشغيلات الصالحة — لا بيانات وهمية</span>
-    </div>
-    <div class="table-container table-scroll">
-      <table class="dense-table">
-        <thead>
-          <tr>
-            <th style="width:45px">#</th><th style="width:70px">الكود</th><th>الاسم</th><th style="width:150px">الاسم العلمي</th>
-            <th style="width:100px">الفئة</th><th style="width:60px">الوحدة</th><th style="width:90px">سعر البيع</th>
-            <th style="width:100px">متوسط التكلفة</th><th style="width:70px">الرصيد</th><th style="width:75px">الحد الأدنى</th>
-            <th style="width:110px">أقرب انتهاء</th><th style="width:75px">الحالة</th><th style="width:52px"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="it in filtered" :key="it.id">
-            <td>{{ it.id }}</td>
-            <td>{{ it.code }}</td>
-            <td style="font-weight:bold">{{ it.name }}</td>
-            <td>{{ it.scientific || '—' }}</td>
-            <td>{{ it.category || '—' }}</td>
-            <td>{{ it.unit || '—' }}</td>
-            <td class="num">{{ fmt(it.sellPrice) }}</td>
-            <td class="num">{{ fmt(it.avgCost) }}</td>
-            <td class="num" :class="{ 'stock-low': it.stock <= (it.minStock || 0) && it.stock > 0, 'stock-out': it.stock === 0 }"><b>{{ it.stock === 0 ? 'نفذ' : it.stock }}</b></td>
-            <td class="num">{{ it.minStock || 0 }}</td>
-            <td :class="expiryClass(it.nextExpiry)">{{ fmtDate(it.nextExpiry) || '—' }}</td>
-            <td><span class="status-chip" :class="isActive(it) ? 'ok' : 'off'">{{ isActive(it) ? 'نشط' : 'معطَّل' }}</span></td>
-            <td><button class="delete-btn" @click="handleDelete(it)" :title="it.hasMovement ? 'لا يمكن الحذف — له حركات' : 'حذف'">{{ it.hasMovement ? '🔒' : '✕' }}</button></td>
-          </tr>
-          <tr v-if="filtered.length === 0">
-            <td colspan="13" class="empty-state">لا توجد أصناف بعد — أنشئ أول صنف. لا توجد بيانات وهمية في هذا النظام.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="totals-bar">
-      <div class="totals-right">
-        <span class="total-item">أصناف: <b>{{ filtered.length }}</b></span>
-        <span class="total-item" style="color:var(--color-warning)">منخفضة: <b>{{ lowCount }}</b></span>
-        <span class="total-item" style="color:var(--color-error)">نفدت: <b>{{ outCount }}</b></span>
+    <div class="page-screen">
+      <div class="page-header">
+        <div class="page-title">
+          <h1>الأصناف</h1>
+          <p class="page-subtitle">إدارة أصناف المخزون — العدد: {{ filtered.length }} · قيمة المخزون: {{ fmt(inventoryValue) }} ري</p>
+        </div>
+        <button class="btn btn-primary btn-lg" @click="openForm()">
+          <span>جديد</span><span class="btn-icon">+</span>
+        </button>
       </div>
-      <div class="totals-left"><span class="total-item">قيمة المخزون: <b class="total-net">{{ fmt(inventoryValue) }}</b></span></div>
+
+      <div class="filter-row">
+        <div class="filter-chip active" :class="{ active: stockFilter === '' }" @click="stockFilter = ''">
+          <span>الكل</span><span class="chip-count">{{ items.length }}</span>
+        </div>
+        <div class="filter-chip" :class="{ active: stockFilter === 'low' }" @click="stockFilter = stockFilter === 'low' ? '' : 'low'">
+          <span>رصيد منخفض ⚠</span><span class="chip-count">{{ lowCount }}</span>
+        </div>
+        <div class="filter-chip" :class="{ active: stockFilter === 'out' }" @click="stockFilter = stockFilter === 'out' ? '' : 'out'">
+          <span>نفذ من المخزون</span><span class="chip-count">{{ outCount }}</span>
+        </div>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" placeholder="ابحث بالاسم أو الكود أو الباركود..." v-model="search" />
+          <button class="search-go" @click="applySearch">انتقال</button>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="bolt-table">
+          <thead>
+            <tr>
+              <th style="width:70px">الكود</th>
+              <th>الاسم</th>
+              <th style="width:130px">الاسم العلمي</th>
+              <th style="width:110px">الفئة</th>
+              <th style="width:70px">الوحدة</th>
+              <th style="width:85px">سعر البيع</th>
+              <th style="width:95px">متوسط التكلفة</th>
+              <th style="width:75px">الرصيد</th>
+              <th style="width:75px">الحد الأدنى</th>
+              <th style="width:95px">أقرب انتهاء</th>
+              <th style="width:80px">الحالة</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="it in filtered" :key="it.id">
+              <td><span class="link-cell">{{ it.code }}</span></td>
+              <td style="font-weight:600">{{ it.name }}<span v-if="it.prescription" class="rx-chip">وصفة</span></td>
+              <td>{{ it.scientific || '—' }}</td>
+              <td>{{ it.category || '—' }}</td>
+              <td>{{ unitLabel(it.unit) }}</td>
+              <td class="num-cell">{{ fmt(it.sellPrice) }}</td>
+              <td class="num-cell">{{ fmt(it.avgCost) }}</td>
+              <td class="num-cell">
+                <span v-if="it.stock === 0" class="stock-out">نفذ</span>
+                <span v-else-if="it.stock <= (it.minStock || 0)" class="stock-low" :title="'الحد الأدنى: ' + (it.minStock || 0)">{{ it.stock }} ⚠</span>
+                <span v-else class="stock-ok-num">{{ it.stock }}</span>
+              </td>
+              <td class="num-cell">{{ it.minStock || 0 }}</td>
+              <td :class="expiryClass(it.nextExpiry)">{{ fmtDate(it.nextExpiry) || '—' }}</td>
+              <td><span class="status-name" :class="isActive(it) ? 'ok' : 'off'">{{ isActive(it) ? 'نشط' : 'معطّل' }}</span></td>
+              <td><button class="act danger" @click="handleDelete(it)" :title="it.hasMovement ? 'لا يمكن الحذف — له حركات (سيتم تعطيله)' : 'حذف'">{{ it.hasMovement ? '🔒' : '✕' }}</button></td>
+            </tr>
+            <tr v-if="filtered.length === 0">
+              <td colspan="12" class="empty-row">
+                <div class="empty-box">
+                  <span class="empty-icon">💊</span>
+                  <p class="empty-title">لا توجد أصناف بعد</p>
+                  <p class="empty-hint">اضغط زر «جديد» لإضافة أول صنف — لا توجد بيانات وهمية في هذا النظام</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
+    <div class="totals-bar-mini">
+      <span>أصناف: <b>{{ filtered.length }}</b></span>
+      <span style="color:#d97706">منخفضة: <b>{{ lowCount }}</b></span>
+      <span style="color:#dc2626">نفدت: <b>{{ outCount }}</b></span>
+      <span class="net-value">قيمة المخزون (FEFO حقيقي): <b>{{ fmt(inventoryValue) }} ري</b></span>
+    </div>
+
+    <!-- نموذج إضافة/تعديل صنف -->
     <div v-if="showForm" class="form-modal-overlay" @click.self="showForm = false">
-      <div class="form-modal">
-        <div class="modal-title"><span>{{ editing ? 'تعديل صنف' : 'صنف جديد' }}</span><button class="close-btn" @click="showForm = false">✕</button></div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="field-row"><label>الكود</label><input type="text" class="input-field" v-model="form.code" placeholder="يُولَّد تلقائيًا إن ترك فارغًا" /></div>
-            <div class="field-row"><label>الباركود</label><input type="text" class="input-field" v-model="form.barcode" /></div>
-            <div class="field-row" style="grid-column:1/-1"><label>الاسم التجاري *</label><input type="text" class="input-field" v-model="form.name" /></div>
-            <div class="field-row" style="grid-column:1/-1"><label>الاسم العلمي</label><input type="text" class="input-field" v-model="form.scientific" /></div>
-            <div class="field-row"><label>الفئة</label><input type="text" class="input-field" v-model="form.category" placeholder="مضادات حيوية / مسكنات / ..." list="cat-list" />
-              <datalist id="cat-list"><option>مسكنات</option><option>مضادات حيوية</option><option>أمراض مزمنة</option><option>فيتامينات</option><option>مستلزمات</option><option>أخرى</option></datalist>
-            </div>
-            <div class="field-row"><label>الوحدة</label>
-              <select class="input-field" v-model="form.unit">
-                <option v-for="u in units" :key="u" :value="u">{{ u }}</option>
-              </select>
-            </div>
-            <div class="field-row"><label>سعر البيع</label><input type="number" class="input-field" v-model.number="form.sellPrice" min="0" step="0.01" /></div>
-            <div class="field-row"><label>تكلفة الشراء</label><input type="number" class="input-field" v-model.number="form.costPrice" min="0" step="0.01" /></div>
-            <div class="field-row"><label>الحد الأدنى</label><input type="number" class="input-field" v-model.number="form.minStock" min="0" /></div>
-            <div class="field-row"><label>يحتاج وصفة؟</label>
-              <select class="input-field" v-model="form.prescription"><option :value="false">لا</option><option :value="true">نعم</option></select>
-            </div>
+      <div class="form-card-wide">
+        <div class="form-card-title">
+          <span>{{ editing ? 'تعديل صنف' : 'صنف جديد' }}</span>
+          <button class="close-btn" @click="showForm = false">✕</button>
+        </div>
+        <div class="item-form-fields">
+          <div class="field-card" style="flex:0.8">
+            <label>الكود</label>
+            <input type="text" class="fi" v-model="form.code" placeholder="يُولَّد تلقائيًا إن ترك فارغًا" />
+          </div>
+          <div class="field-card" style="flex:0.9">
+            <label>الباركود</label>
+            <input type="text" class="fi" v-model="form.barcode" />
+          </div>
+          <div class="field-card" style="flex:1.4">
+            <label>الاسم التجاري *</label>
+            <input type="text" class="fi" v-model="form.name" />
+          </div>
+          <div class="field-card" style="flex:1.2">
+            <label>الاسم العلمي</label>
+            <input type="text" class="fi" v-model="form.scientific" />
+          </div>
+          <div class="field-card" style="flex:1.1">
+            <label>الفئة</label>
+            <input type="text" class="fi" v-model="form.category" placeholder="مضادات حيوية / مسكنات / ..." list="cat-list" />
+            <datalist id="cat-list"><option>مسكنات</option><option>مضادات حيوية</option><option>أمراض مزمنة</option><option>فيتامينات</option><option>مستلزمات</option><option>أخرى</option></datalist>
+          </div>
+          <div class="field-card">
+            <label>الوحدة</label>
+            <select class="fi" v-model="form.unit">
+              <option v-for="u in units" :key="u" :value="u">{{ u }}</option>
+            </select>
+          </div>
+          <div class="field-card">
+            <label>سعر البيع</label>
+            <input type="number" class="fi" v-model.number="form.sellPrice" min="0" step="0.01" />
+          </div>
+          <div class="field-card">
+            <label>تكلفة الشراء</label>
+            <input type="number" class="fi" v-model.number="form.costPrice" min="0" step="0.01" />
+          </div>
+          <div class="field-card">
+            <label>الحد الأدنى</label>
+            <input type="number" class="fi" v-model.number="form.minStock" min="0" />
+          </div>
+          <div class="field-card">
+            <label>يحتاج وصفة؟</label>
+            <select class="fi" v-model="form.prescription"><option :value="false">لا</option><option :value="true">نعم</option></select>
           </div>
         </div>
-        <div class="form-actions">
-          <span v-if="formError" class="form-error">{{ formError }}</span>
-          <button class="btn btn-primary" @click="saveItem" :disabled="saving">{{ saving ? 'جارٍ...' : 'حفظ' }}</button>
-          <button class="btn btn-secondary" @click="showForm = false">إلغاء</button>
+        <div v-if="formError" class="form-msg form-msg-error">{{ formError }}</div>
+        <div class="form-actions-row">
+          <button class="btn btn-outline" @click="showForm = false">إلغاء</button>
+          <button class="btn btn-primary" @click="saveItem" :disabled="saving">
+            <span v-if="saving" class="spin">⏳</span>
+            <span>{{ saving ? 'جارٍ الحفظ...' : 'حفظ' }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -90,10 +153,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { db } from '../../db/database.js'
+import { db, isActive } from '../../db/database.js'
 import { fmt } from '../../db/engine.js'
 import { requirePermission } from '../../db/session.js'
-import { isActive } from '../../db/database.js'
 
 const items = ref([])
 const stockInfo = ref({})
@@ -127,6 +189,7 @@ const lowCount = computed(() => enriched.value.filter(it => it.stock > 0 && it.s
 const outCount = computed(() => enriched.value.filter(it => it.stock === 0).length)
 const inventoryValue = computed(() => enriched.value.reduce((s, it) => s + it.stock * (it.avgCost || 0), 0))
 
+function unitLabel(u) { return { box: 'علبة', strip: 'شريط', tab: 'قرص', vial: 'قارورة', box_of_vials: 'علبة قوارير' }[u] || u || 'وحدة' }
 function fmtDate(ts) { if (!ts) return ''; try { return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return ''; } }
 function expiryClass(exp) {
   if (!exp) return ''
@@ -136,6 +199,7 @@ function expiryClass(exp) {
   if (days <= 120) return 'expiry-yellow'
   return 'expiry-green'
 }
+function applySearch() { /* مفعّل عبر v-model */ }
 
 async function loadData() {
   items.value = await db.items.toArray()
@@ -205,41 +269,94 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+/* ============================================
+   شاشة الأصناف — نمط bolt.host
+   ============================================ */
 .items-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.screen-toolbar { display: flex; gap: 6px; padding: 6px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 2px; margin-bottom: 6px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
-.toolbar-spacer { flex: 1; }
-.toolbar-info { font-size: 12px; color: var(--color-text-secondary); }
-.table-scroll { flex: 1; overflow: auto; background: var(--color-bg-primary); min-height: 0; }
-.empty-state { text-align: center; color: var(--color-text-secondary); padding: 18px; }
-.num { text-align: left; direction: ltr; }
-.stock-low { color: var(--color-warning); font-weight: bold; }
-.stock-out { color: var(--color-error); font-weight: bold; }
-.status-chip { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
-.status-chip.ok { background: #e6f4ea; color: #1b5e20; }
-.status-chip.off { background: #f0f0f0; color: #777; }
-.expiry-green { color: var(--color-success); font-weight: bold }
-.expiry-yellow { color: #f9a825; font-weight: bold }
-.expiry-orange { color: var(--color-warning); font-weight: bold }
-.expiry-red { color: var(--color-error); font-weight: bold }
-.totals-bar { display: flex; justify-content: space-between; padding: 5px 8px; background: var(--color-bg-secondary); border-top: 1px solid var(--color-border); font-size: 13px; flex-shrink: 0; }
-.total-item { margin-left: 14px; }
-.total-net { color: var(--color-primary); }
-.btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px; }
-.btn-primary { background: var(--color-primary); color: #fff; }
-.btn-secondary { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); }
-.input-field { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 3px; font-size: 13px; background: #fff; }
-.input-field.search { width: 240px; }
-.input-field:focus { outline: none; border-color: var(--color-primary); }
-.delete-btn { background: #fdeaea; color: #b71c1c; border: 1px solid #f0bcbc; border-radius: 3px; width: 24px; height: 26px; cursor: pointer; }
-.form-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px; }
-.form-modal { background: var(--color-bg-primary); border: 2px solid var(--color-primary); border-radius: 4px; width: 600px; max-width: 95vw; box-shadow: 4px 4px 16px rgba(0,0,0,0.3); max-height: 92vh; overflow: auto; }
-.modal-title { display: flex; justify-content: space-between; align-items: center; background: var(--color-primary); color: #fff; font-weight: bold; padding: 6px 12px; }
-.close-btn { background: transparent; border: none; color: #fff; cursor: pointer; }
-.modal-body { padding: 12px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.field-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.field-row label { width: 100px; font-size: 13px; flex-shrink: 0; color: var(--color-text-secondary); }
-.form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 12px; background: var(--color-bg-secondary); border-top: 1px solid var(--color-border); }
-.form-error { color: #b71c1c; font-size: 12px; flex: 1; }
-@media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } .screen-toolbar { flex-direction: column; align-items: stretch; } .input-field.search { width: 100%; } .table-container { overflow-x: auto; } .table-container table { min-width: 980px; } }
+.page-screen { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow: auto; flex: 1; }
+.page-header { display: flex; align-items: center; justify-content: space-between; }
+.page-title h1 { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+.page-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+.link-cell { color: #2563eb; font-weight: 600; cursor: pointer; text-decoration: none; }
+.num-cell { text-align: left; direction: ltr; font-variant-numeric: tabular-nums; }
+
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-chip { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 13px; color: #475569; cursor: pointer; transition: all 0.15s; }
+.filter-chip:hover { border-color: #2563eb; color: #2563eb; }
+.filter-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+.chip-count { font-size: 11px; opacity: 0.75; background: rgba(0,0,0,0.08); border-radius: 999px; padding: 0 6px; min-width: 20px; text-align: center; }
+.filter-chip.active .chip-count { background: rgba(255,255,255,0.25); }
+
+.search-box { margin-right: auto; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+.search-icon { font-size: 12px; }
+.search-input { border: none; outline: none; background: transparent; font-size: 13px; width: 220px; font-family: inherit; }
+.search-go { height: 24px; padding: 0 10px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+
+.table-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); overflow: auto; flex: 1; min-height: 0; }
+.bolt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bolt-table thead th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; }
+.bolt-table tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.bolt-table tbody tr:hover td { background: #f8fafc; }
+.bolt-table .row-total { font-weight: 700; color: #0f172a; }
+.empty-row td { padding: 48px 24px !important; border-bottom: none; }
+.empty-box { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #94a3b8; }
+.empty-icon { font-size: 40px; }
+.empty-title { font-size: 15px; font-weight: 700; color: #475569; }
+.empty-hint { font-size: 12px; }
+
+.rx-chip { font-size: 10px; color: #d97706; background: #fef3c7; border-radius: 999px; padding: 1px 6px; margin-right: 6px; font-weight: 700; }
+.stock-low { color: #d97706; font-weight: 700; }
+.stock-out { color: #dc2626; font-weight: 700; }
+.stock-ok-num { color: #16a34a; font-weight: 600; }
+.expiry-green { color: #16a34a; font-weight: 700; }
+.expiry-yellow { color: #f59e0b; font-weight: 700; }
+.expiry-orange { color: #d97706; font-weight: 700; }
+.expiry-red { color: #dc2626; font-weight: 700; }
+
+.action-cells { display: flex; gap: 4px; }
+.act { height: 28px; width: 30px; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+.act:hover { background: #eff6ff; border-color: #2563eb; }
+.act.danger { color: #dc2626; }
+.act.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+.status-name { font-size: 12px; font-weight: 600; }
+.status-name.ok { color: #15803d; }
+.status-name.off { color: #9ca3af; }
+
+.totals-bar-mini { display: flex; gap: 18px; padding: 8px 24px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 12px; color: #475569; flex-shrink: 0; }
+.net-value { margin-right: auto; font-weight: 600; color: #0f172a; }
+
+/* ---------- نموذج الصنف ---------- */
+.form-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.form-card-wide { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); width: 760px; max-width: 96vw; max-height: 92vh; overflow: auto; padding: 20px; }
+.form-card-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-size: 16px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+.close-btn { background: transparent; border: none; font-size: 14px; color: #64748b; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.close-btn:hover { background: #f1f5f9; color: #0f172a; }
+.item-form-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.field-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.field-card label { font-size: 11px; font-weight: 600; color: #64748b; }
+.fi { height: 34px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0 10px; font-size: 13px; font-family: inherit; color: #0f172a; background: #fff; outline: none; }
+.fi:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15); }
+
+.form-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 12px; }
+.form-msg-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.form-msg-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+.form-actions-row { display: flex; gap: 10px; justify-content: flex-end; padding-top: 14px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 18px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; }
+.btn-lg { height: 40px; padding: 0 20px; font-size: 14px; }
+.btn-icon { font-size: 16px; line-height: 1; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline { background: #fff; color: #374151; border-color: #d1d5db; }
+.btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .item-form-fields { flex-direction: column; }
+  .field-card { min-width: 100%; }
+  .page-screen { padding: 16px; }
+  .bolt-table { min-width: 980px; }
+}
 </style>

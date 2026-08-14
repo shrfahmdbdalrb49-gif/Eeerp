@@ -1,53 +1,97 @@
 <template>
   <div class="suppliers-screen">
-    <div class="screen-toolbar">
-      <button class="btn btn-primary" @click="openForm()">+ مورد جديد</button>
-      <input type="text" class="input-field search" placeholder="🔍 بحث بالاسم أو الهاتف..." v-model="search" />
-      <span class="toolbar-spacer"></span>
-      <span class="toolbar-info">الرصيد المستحق = فواتير الشراء الآجلة − سداد الموردين (مشتق من البيانات الفعلية)</span>
-    </div>
-    <div class="table-container table-scroll">
-      <table class="dense-table">
-        <thead>
-          <tr>
-            <th style="width:45px">#</th><th style="width:75px">الكود</th><th>الاسم</th><th style="width:120px">الهاتف</th>
-            <th style="width:100px">عدد الفواتير</th><th style="width:105px">إجمالي المشتريات</th><th style="width:105px">المسدَّد</th>
-            <th style="width:110px">الرصيد المستحق</th><th style="width:65px">الحالة</th><th style="width:52px"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in filtered" :key="s.id">
-            <td>{{ s.id }}</td>
-            <td>{{ s.code }}</td>
-            <td style="font-weight:bold">{{ s.name }}</td>
-            <td>{{ s.phone || '—' }}</td>
-            <td class="num">{{ s.invoiceCount }}</td>
-            <td class="num">{{ fmt(s.totalPurchases) }}</td>
-            <td class="num">{{ fmt(s.totalPaid) }}</td>
-            <td class="num"><b :class="s.balance > 0 ? 'balance-due' : ''">{{ fmt(s.balance) }}</b></td>
-            <td><span class="status-chip" :class="s.status === 'active' ? 'ok' : 'off'">{{ s.status === 'active' ? 'نشط' : 'معطَّل' }}</span></td>
-            <td><button class="delete-btn" @click="handleDelete(s)">{{ s.hasPurchases ? '🔒' : '✕' }}</button></td>
-          </tr>
-          <tr v-if="filtered.length === 0">
-            <td colspan="10" class="empty-state">لا يوجد موردون بعد — أنشئ أول مورد. لا توجد بيانات وهمية.</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="page-screen">
+      <div class="page-header">
+        <div class="page-title">
+          <h1>الموردون</h1>
+          <p class="page-subtitle">الذمم الدائنة — العدد: {{ suppliers.length }} · الرصيد الإجمالي المستحق: {{ fmt(totalBalance) }} ري</p>
+        </div>
+        <button class="btn btn-primary btn-lg" @click="openForm()">
+          <span>جديد</span><span class="btn-icon">+</span>
+        </button>
+      </div>
+
+      <div class="filter-row">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" placeholder="ابحث بالاسم أو الهاتف..." v-model="search" />
+          <button class="search-go" @click="applySearch">انتقال</button>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="bolt-table">
+          <thead>
+            <tr>
+              <th style="width:80px">الكود</th>
+              <th>الاسم</th>
+              <th style="width:110px">الهاتف</th>
+              <th style="width:85px">عدد الفواتير</th>
+              <th style="width:100px">إجمالي المشتريات</th>
+              <th style="width:95px">المسدَّد</th>
+              <th style="width:105px; text-align:left">الرصيد المستحق</th>
+              <th style="width:80px">الحالة</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in filtered" :key="s.id">
+              <td><span class="link-cell">{{ s.code }}</span></td>
+              <td style="font-weight:600">{{ s.name }}</td>
+              <td>{{ s.phone || '—' }}</td>
+              <td class="num-cell">{{ s.invoiceCount }}</td>
+              <td class="num-cell">{{ fmt(s.totalPurchases) }}</td>
+              <td class="num-cell">{{ fmt(s.totalPaid) }}</td>
+              <td class="num-cell"><b :class="s.balance > 0 ? 'balance-due' : 'credit-zero'">{{ fmt(s.balance) }}</b></td>
+              <td><span class="status-dot" :class="s.status === 'active' ? 'ok' : 'off'"></span><span class="status-name" :class="s.status === 'active' ? 'ok' : 'off'">{{ s.status === 'active' ? 'نشط' : 'معطّل' }}</span></td>
+              <td><button class="act danger" @click="handleDelete(s)" :title="s.hasPurchases ? 'لديه مشتريات — سيتم تعطيله بدلًا من الحذف' : 'حذف'">{{ s.hasPurchases ? '🔒' : '✕' }}</button></td>
+            </tr>
+            <tr v-if="filtered.length === 0">
+              <td colspan="9" class="empty-row">
+                <div class="empty-box">
+                  <span class="empty-icon">🚚</span>
+                  <p class="empty-title">لا يوجد موردون بعد</p>
+                  <p class="empty-hint">اضغط زر «جديد» لإضافة أول مورد — الرصيد المشتق من البيانات الفعلية لا بيانات وهمية</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
+    <!-- نموذج إضافة/تعديل مورد -->
     <div v-if="showForm" class="form-modal-overlay" @click.self="showForm = false">
-      <div class="form-modal">
-        <div class="modal-title"><span>{{ editing ? 'تعديل مورد' : 'مورد جديد' }}</span><button class="close-btn" @click="showForm = false">✕</button></div>
-        <div class="modal-body">
-          <div class="field-row"><label>الكود</label><input type="text" class="input-field" v-model="form.code" placeholder="يُولَّد تلقائيًا" /></div>
-          <div class="field-row"><label>الاسم *</label><input type="text" class="input-field" v-model="form.name" /></div>
-          <div class="field-row"><label>الهاتف</label><input type="text" class="input-field" v-model="form.phone" /></div>
-          <div class="field-row"><label>ملاحظات</label><input type="text" class="input-field" v-model="form.notes" /></div>
+      <div class="form-card-wide">
+        <div class="form-card-title">
+          <span>{{ editing ? 'تعديل مورد' : 'مورد جديد' }}</span>
+          <button class="close-btn" @click="showForm = false">✕</button>
         </div>
-        <div class="form-actions">
-          <span v-if="formError" class="form-error">{{ formError }}</span>
-          <button class="btn btn-primary" @click="saveSupplier" :disabled="saving">{{ saving ? 'جارٍ...' : 'حفظ' }}</button>
-          <button class="btn btn-secondary" @click="showForm = false">إلغاء</button>
+        <div class="field-list">
+          <div class="field-row-wide">
+            <label>الكود</label>
+            <input type="text" class="fi" v-model="form.code" placeholder="يُولَّد تلقائيًا إن ترك فارغًا" />
+          </div>
+          <div class="field-row-wide">
+            <label>الاسم *</label>
+            <input type="text" class="fi" v-model="form.name" />
+          </div>
+          <div class="field-row-wide">
+            <label>الهاتف</label>
+            <input type="text" class="fi" v-model="form.phone" placeholder="05xxxxxxxx" />
+          </div>
+          <div class="field-row-wide">
+            <label>ملاحظات</label>
+            <input type="text" class="fi" v-model="form.notes" placeholder="أي ملاحظات عن المورد..." />
+          </div>
+        </div>
+        <div v-if="formError" class="form-msg form-msg-error">{{ formError }}</div>
+        <div class="form-actions-row">
+          <button class="btn btn-outline" @click="showForm = false">إلغاء</button>
+          <button class="btn btn-primary" @click="saveSupplier" :disabled="saving">
+            <span v-if="saving" class="spin">⏳</span>
+            <span>{{ saving ? 'جارٍ الحفظ...' : 'حفظ' }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -75,7 +119,8 @@ async function enrichSupplier(s) {
   const totalPurchases = invoices.reduce((sum, i) => sum + (i.total || 0), 0)
   const payments = await db.supplierPayments.where('supplierId').equals(s.id).toArray()
   const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
-  return { ...s, invoiceCount, totalPurchases, totalPaid, balance: creditPurchases - totalPaid }
+  const hasPurchases = invoiceCount > 0 || payments.length > 0
+  return { ...s, invoiceCount, totalPurchases, totalPaid, balance: creditPurchases - totalPaid, hasPurchases }
 }
 
 const filtered = computed(() => {
@@ -83,6 +128,10 @@ const filtered = computed(() => {
   if (!q) return suppliers.value
   return suppliers.value.filter(s => s.name.toLowerCase().includes(q) || (s.phone || '').includes(q))
 })
+
+const totalBalance = computed(() => suppliers.value.reduce((s, x) => s + Math.max(0, x.balance || 0), 0))
+
+function applySearch() { /* مفعّل عبر v-model */ }
 
 async function loadData() {
   const raw = await db.suppliers.toArray()
@@ -140,32 +189,79 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+/* ============================================
+   شاشة الموردون — نمط bolt.host
+   ============================================ */
 .suppliers-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.screen-toolbar { display: flex; gap: 6px; padding: 6px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 2px; margin-bottom: 6px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
-.toolbar-spacer { flex: 1; }
-.toolbar-info { font-size: 12px; color: var(--color-text-secondary); }
-.table-scroll { flex: 1; overflow: auto; background: var(--color-bg-primary); min-height: 0; }
-.empty-state { text-align: center; color: var(--color-text-secondary); padding: 18px; }
-.num { text-align: left; direction: ltr; }
-.balance-due { color: #e65100; font-weight: bold; }
-.status-chip { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
-.status-chip.ok { background: #e6f4ea; color: #1b5e20; }
-.status-chip.off { background: #f0f0f0; color: #777; }
-.btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px; }
-.btn-primary { background: var(--color-primary); color: #fff; }
-.btn-secondary { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); }
-.input-field { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 3px; font-size: 13px; background: #fff; }
-.input-field.search { width: 220px; }
-.input-field:focus { outline: none; border-color: var(--color-primary); }
-.delete-btn { background: #fdeaea; color: #b71c1c; border: 1px solid #f0bcbc; border-radius: 3px; width: 24px; height: 26px; cursor: pointer; }
-.form-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 12px; }
-.form-modal { background: var(--color-bg-primary); border: 2px solid var(--color-primary); border-radius: 4px; width: 460px; max-width: 94vw; box-shadow: 4px 4px 16px rgba(0,0,0,0.3); }
-.modal-title { display: flex; justify-content: space-between; align-items: center; background: var(--color-primary); color: #fff; font-weight: bold; padding: 6px 12px; }
-.close-btn { background: transparent; border: none; color: #fff; cursor: pointer; }
-.modal-body { padding: 12px; }
-.field-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.field-row label { width: 85px; font-size: 13px; flex-shrink: 0; color: var(--color-text-secondary); }
-.form-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 12px; background: var(--color-bg-secondary); border-top: 1px solid var(--color-border); }
-.form-error { color: #b71c1c; font-size: 12px; flex: 1; }
-@media (max-width: 768px) { .field-row { flex-wrap: wrap; } .field-row label { width: 100%; } .screen-toolbar { flex-direction: column; align-items: stretch; } .input-field.search { width: 100%; } }
+.page-screen { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow: auto; flex: 1; }
+.page-header { display: flex; align-items: center; justify-content: space-between; }
+.page-title h1 { font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+.page-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+.link-cell { color: #2563eb; font-weight: 600; cursor: pointer; text-decoration: none; }
+.num-cell { text-align: left; direction: ltr; font-variant-numeric: tabular-nums; }
+
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.search-box { margin-right: auto; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+.search-icon { font-size: 12px; }
+.search-input { border: none; outline: none; background: transparent; font-size: 13px; width: 220px; font-family: inherit; }
+.search-go { height: 24px; padding: 0 10px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+
+.table-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); overflow: auto; flex: 1; min-height: 0; }
+.bolt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bolt-table thead th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; }
+.bolt-table tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.bolt-table tbody tr:hover td { background: #f8fafc; }
+.empty-row td { padding: 48px 24px !important; border-bottom: none; }
+.empty-box { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #94a3b8; }
+.empty-icon { font-size: 40px; }
+.empty-title { font-size: 15px; font-weight: 700; color: #475569; }
+.empty-hint { font-size: 12px; }
+
+.balance-due { color: #ea580c; }
+.credit-zero { color: #15803d; }
+
+.act { height: 28px; width: 30px; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+.act:hover { background: #eff6ff; border-color: #2563eb; }
+.act.danger { color: #dc2626; }
+.act.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; margin-left: 6px; }
+.status-dot.ok { background: #16a34a; }
+.status-dot.off { background: #d1d5db; }
+.status-name { font-size: 12px; font-weight: 600; }
+.status-name.ok { color: #15803d; }
+.status-name.off { color: #9ca3af; }
+
+/* ---------- نموذج المورد ---------- */
+.form-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.form-card-wide { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); width: 560px; max-width: 96vw; max-height: 92vh; overflow: auto; padding: 20px; }
+.form-card-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-size: 16px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+.close-btn { background: transparent; border: none; font-size: 14px; color: #64748b; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.close-btn:hover { background: #f1f5f9; color: #0f172a; }
+.field-list { display: flex; flex-direction: column; gap: 10px; }
+.field-row-wide { display: flex; align-items: center; gap: 10px; }
+.field-row-wide label { width: 110px; font-size: 12px; font-weight: 600; color: #64748b; flex-shrink: 0; }
+.fi { flex: 1; height: 36px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 12px; font-size: 13px; font-family: inherit; color: #0f172a; background: #fff; outline: none; }
+.fi:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15); }
+
+.form-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 12px; }
+.form-msg-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.form-actions-row { display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 18px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; }
+.btn-lg { height: 40px; padding: 0 20px; font-size: 14px; }
+.btn-icon { font-size: 16px; line-height: 1; }
+.btn-primary { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline { background: #fff; color: #374151; border-color: #d1d5db; }
+.btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .field-row-wide { flex-wrap: wrap; }
+  .field-row-wide label { width: 100%; }
+  .page-screen { padding: 16px; }
+  .bolt-table { min-width: 980px; }
+}
 </style>
