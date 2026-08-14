@@ -37,7 +37,7 @@
           {{ avatarChar }}
         </span>
         <span class="user-name">{{ userName }}</span>
-        <span class="user-role">{{ roleLabel }}</span>
+        <span v-if="roleLabel !== userName" class="user-role">· {{ roleLabel }}</span>
       </div>
     </div>
   </header>
