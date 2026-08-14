@@ -304,7 +304,19 @@ const pageWindowTypes = {
   about: { type: 'generic', title: 'حول النظام' },
 }
 
+const EXTRA_KEYS = ['fixed-assets','asset-depreciation','asset-disposal','asset-inventory','payroll','hr-attendance','hr-loans','hr-end-service','hr-reports']
+const AR_TITLES = {"fixed-assets": "دليل الأصول الثابتة", "asset-depreciation": "إهلاك الأصول", "asset-disposal": "بيع واستبعاد الأصول", "asset-inventory": "جرد الأصول الثابتة", "payroll": "مسيرات الرواتب", "hr-attendance": "الحضور والانصراف", "hr-loans": "السلف والخصومات", "hr-end-service": "نهاية الخدمة", "hr-reports": "تقارير الموارد البشرية"}
+EXTRA_KEYS.forEach((k) => { pageWindowTypes[k] = { type: 'generic', title: AR_TITLES[k] } })
 const pageDescriptions = {
+  'hr-reports': 'تقارير الموارد البشرية والرواتب.',
+  'hr-end-service': 'حساب مستحقات نهاية الخدمة.',
+  'hr-loans': 'السلف للموظفين وجدولة الخصومات من الرواتب.',
+  'hr-attendance': 'تسجيل الحضور والانصراف للموظفين.',
+  'payroll': 'مسيرات الرواتب الشهرية والاستحقاقات والخصومات.',
+  'asset-inventory': 'جرد الأصول الثابتة ومطابقة الأرصدة الفعلية.',
+  'asset-disposal': 'بيع واستبعاد الأصول الثابتة وحساب المكاسب والخسائر.',
+  'asset-depreciation': 'حساب إهلاك الأصول بالطرق المحاسبية المعتمدة.',
+  'fixed-assets': 'دليل الأصول الثابتة وتواريخ الشراء وقيم الدفاتر.',
   pos: 'شاشة نقطة البيع للمبيعات السريعة بالبحث عن الأدوية وإتمام البيع الفوري.',
   customers: 'سجل المرضى والعملاء مع أرصدتهم الآجلة ونوع التأمين.',
   doctors: 'دليل الأطباء وتخصصاتهم وأرقام التراخيص.',

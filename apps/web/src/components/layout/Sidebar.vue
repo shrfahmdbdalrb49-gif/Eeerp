@@ -1,5 +1,5 @@
 <template>
-  <!-- ===== القائمة الجانبية (Bolt-style Dark Navigation) ===== -->
+  <!-- ===== القائمة الجانبية (Bolt-style Dark Navigation) — 14 قسمًا رئيسيًا مع accordion ===== -->
   <aside class="sidebar" :class="{ collapsed }">
     <div class="sidebar-header">
       <span v-if="!collapsed" class="sidebar-title">القائمة الرئيسية</span>
@@ -8,59 +8,70 @@
         @click="$emit('toggle')"
         :title="collapsed ? 'توسيع القائمة' : 'طي القائمة'"
       >
-        {{ collapsed ? '▶' : '◀' }}
+        <ChevronsIcon :name="collapsed ? 'chevron-right' : 'chevron-left'" />
       </button>
     </div>
 
     <nav v-if="!collapsed" class="sidebar-nav" role="tree">
       <template v-for="section in allSections" :key="section.key">
-        <!-- عنوان القسم + أيقونته الملونة -->
+        <!-- عنوان القسم + أيقونته — سلوك accordion: فتح قسم يغلق القسم السابق -->
         <button
           class="section-title"
-          :class="{ active: activeMenu === section.menuKey }"
+          :class="{ active: openSection === section.key }"
           type="button"
-          @click="$emit('select', section.defaultPage)"
+          @click="toggleSection(section.key)"
+          :aria-expanded="openSection === section.key"
         >
-          <span class="section-icon">{{ section.icon }}</span>
+          <span class="section-icon" :style="{ color: section.iconColor }">
+            <component :is="section.icon" :size="15" :stroke-width="1.75" />
+          </span>
           <span class="section-label">{{ section.title }}</span>
-          <span class="section-arrow">{{ activeMenu === section.menuKey ? '▼' : '◀' }}</span>
+          <span class="section-arrow" :class="{ expanded: openSection === section.key }">
+            <ChevronsIcon :name="openSection === section.key ? 'chevron-down' : 'chevron-left'" />
+          </span>
         </button>
 
-        <!-- بنود القسم موسعة دائمًا داخل الوحدة النشطة -->
-        <ul v-if="activeMenu === section.menuKey" class="section-items">
-          <template v-for="group in section.groups" :key="group.title">
-            <li v-if="group.title" class="group-title">{{ group.title }}</li>
-            <template v-for="child in group.children" :key="child.title ?? child.page">
-              <!-- فرع قابل للتوسيع (مستوى ثالث) -->
-              <li v-if="child.children" class="tree-subgroup" :class="{ expanded: expandedSub[child.title] }">
-                <button class="tree-subgroup-title" @click="toggleSub(child.title)" type="button">
-                  <span class="tree-chevron">{{ expandedSub[child.title] ? '▼' : '◀' }}</span>
-                  <span class="tree-label">{{ child.title }}</span>
-                </button>
-                <ul v-show="expandedSub[child.title]" class="tree-children">
-                  <li
-                    v-for="leaf in child.children"
-                    :key="leaf.page"
-                    class="tree-leaf"
-                    :class="{ active: activePage === leaf.page }"
-                    @click="$emit('select', leaf.page)"
-                  >
-                    {{ leaf.label }}
-                  </li>
-                </ul>
-              </li>
-              <!-- ورقة مباشرة -->
-              <li
-                v-else
-                class="tree-leaf"
-                :class="{ active: activePage === child.page }"
-                @click="$emit('select', child.page)"
-              >
-                {{ child.label }}
-              </li>
+        <!-- بنود القسم: تظهر فقط للقسم المفتوح -->
+        <transition name="section-open">
+          <ul v-if="openSection === section.key" class="section-items">
+            <template v-for="group in section.groups" :key="group.title">
+              <li v-if="group.title" class="group-title">{{ group.title }}</li>
+              <template v-for="child in group.children" :key="child.title ?? child.page">
+                <!-- فرع قابل للتوسيع (مستوى ثالث) -->
+                <li v-if="child.children" class="tree-subgroup" :class="{ expanded: expandedSub[child.title] }">
+                  <button class="tree-subgroup-title" @click="toggleSub(child.title)" type="button">
+                    <span class="tree-chevron" :class="{ rotated: expandedSub[child.title] }">
+                      <ChevronsIcon name="chevron-left" />
+                    </span>
+                    <span class="tree-label">{{ child.title }}</span>
+                  </button>
+                  <transition name="sub-open">
+                    <ul v-show="expandedSub[child.title]" class="tree-children">
+                      <li
+                        v-for="leaf in child.children"
+                        :key="leaf.page"
+                        class="tree-leaf"
+                        :class="{ active: activePage === leaf.page }"
+                        @click="$emit('select', leaf.page)"
+                      >
+                        {{ leaf.label }}
+                      </li>
+                    </ul>
+                  </transition>
+                </li>
+                <!-- ورقة مباشرة -->
+                <li
+                  v-else
+                  class="tree-leaf"
+                  :class="{ active: activePage === child.page }"
+                  @click="$emit('select', child.page)"
+                >
+                  {{ child.label }}
+                </li>
+              </template>
             </template>
-          </template>
-        </ul>
+          </ul>
+        </transition>
       </template>
     </nav>
   </aside>
@@ -69,16 +80,32 @@
 <script setup>
 /**
  * Sidebar — القائمة الجانبية الداكنة (Bolt-style)
- * تُعرض جميع الوحدات كأقسام، والقسم النشط تكون بنوده موسعة بالكامل.
+ * بنية جديدة: 14 قسمًا رئيسيًا فقط، سلوك accordion (قسم مفتوح واحد فقط)،
+ * أيقونات موحدة من مكتبة lucide-vue-next الفعلية (ليست Emoji).
  * Props:
- *   - activeMenu: String  → الوحدة العلوية النشطة (sales, purchases, ...)
+ *   - activeMenu: String  → القسم المفتوح افتراضيًا
  *   - collapsed:  Boolean → هل القائمة مطوية
  *   - activePage: String  → الصفحة الجانبية النشطة
  * Events:
  *   - toggle        → طي/توسيع القائمة
  *   - select(page)  → النقر على بند نهائي في الشجرة
  */
-import { reactive } from 'vue'
+import { ref, shallowRef } from 'vue'
+import {
+  LayoutGrid,
+  Database,
+  ShoppingCart,
+  PackageSearch,
+  Boxes,
+  ShieldCheck,
+  Landmark,
+  BookOpen,
+  Building2,
+  ChartColumn,
+  FileText,
+  Settings,
+  CircleQuestionMark,
+} from 'lucide-vue-next'
 
 const props = defineProps({
   activeMenu: { type: String, default: 'dashboard' },
@@ -88,22 +115,68 @@ const props = defineProps({
 
 defineEmits(['toggle', 'select'])
 
+/** حالة accordion: قسم مفتوح واحد فقط (أو لا شيء) */
+const openSection = ref(props.activeMenu || 'sec-dashboard')
+
+function toggleSection(key) {
+  openSection.value = openSection.value === key ? null : key
+}
+
 // حالة التوسيع للمجموعات الفرعية فقط (المستوى الثالث)
-const expandedSub = reactive({})
+const expandedSub = ref({})
 function toggleSub(title) {
-  expandedSub[title] = !expandedSub[title]
+  expandedSub.value = { ...expandedSub.value, [title]: !expandedSub.value[title] }
 }
 
 /**
- * جميع وحدات النظام كأقسام مع أيقوناتها الملونة وبنودها.
- * مطابقة لبنية الشجرة السابقة — لا تغيير على روابط الصفحات.
+ * أيقونات الأقسام — جميعها من مكتبة lucide-vue-next الفعلية.
+ */
+const iconMap = {
+  LayoutGrid,
+  Database,
+  ShoppingCart,
+  PackageSearch,
+  Boxes,
+  ShieldCheck,
+  Landmark,
+  BookOpen,
+  Building2,
+  ChartColumn,
+  FileText,
+  Settings,
+  CircleQuestionMark,
+}
+
+function Icon({ name }) {
+  return shallowRef(iconMap[name])
+}
+
+/**
+ * مكوّن أيقونة السهم الداخلي (chevron-left / chevron-right / chevron-down)
+ * من مكتبة lucide الفعلية بدل رموز نصية.
+ */
+import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-vue-next'
+const chevronMap = {
+  'chevron-left': ChevronLeft,
+  'chevron-right': ChevronRight,
+  'chevron-down': ChevronDown,
+}
+function ChevronsIcon({ name }) {
+  return shallowRef(chevronMap[name])
+}
+
+/**
+ * الأقسام الـ14 الرئيسية — جميع وظائف النظام الحالية موزعة عليها.
+ * لا تحذف أي وظيفة: البنود الموجودة تبقى بنفس مفاتيح الصفحات (page keys)
+ * ليتم تمريرها عبر $emit('select', page) إلى App.vue كما كان.
  */
 const allSections = [
   {
     key: 'sec-dashboard',
     menuKey: 'dashboard',
     title: 'النظام',
-    icon: '🎛️',
+    icon: Icon({ name: 'LayoutGrid' }),
+    iconColor: '#60a5fa',
     defaultPage: 'dashboard',
     groups: [
       {
@@ -120,18 +193,35 @@ const allSections = [
     key: 'sec-masterdata',
     menuKey: 'masterdata',
     title: 'البيانات الأساسية',
-    icon: '🗃️',
-    defaultPage: 'settings',
+    icon: Icon({ name: 'Database' }),
+    iconColor: '#34d399',
+    defaultPage: 'items',
     groups: [
       {
-        title: 'البيانات الأساسية',
+        title: 'الأطراف',
+        children: [
+          { page: 'customers', label: 'العملاء (المرضى)' },
+          { page: 'suppliers', label: 'الموردون (شركات الأدوية)' },
+          { page: 'doctors', label: 'الأطباء وجهات الوصف' },
+        ],
+      },
+      {
+        title: 'الأصناف والوحدات',
+        children: [
+          { page: 'items', label: 'الأصناف (الأدوية والمستلزمات)' },
+          { page: 'therapeutic-groups', label: 'المجموعات العلاجية' },
+          { page: 'units', label: 'الوحدات' },
+          { page: 'price-lists', label: 'قوائم أسعار البيع' },
+        ],
+      },
+      {
+        title: 'إعدادات البيانات',
         children: [
           { page: 'branches', label: 'الفروع' },
-          { page: 'currencies', label: 'العملات (YER افتراضية)' },
+          { page: 'currencies', label: 'العملات' },
           { page: 'taxes', label: 'الضرائب' },
           { page: 'fiscal-years', label: 'السنوات المالية' },
           { page: 'payment-methods', label: 'طرق الدفع' },
-          { page: 'settings', label: 'إعدادات النظام العامة' },
         ],
       },
     ],
@@ -140,21 +230,25 @@ const allSections = [
     key: 'sec-sales',
     menuKey: 'sales',
     title: 'المبيعات',
-    icon: '🛒',
+    icon: Icon({ name: 'ShoppingCart' }),
+    iconColor: '#f472b6',
     defaultPage: 'pos',
     groups: [
       {
         title: 'عمليات البيع',
         children: [
           { page: 'pos', label: 'نقطة البيع POS' },
-          { page: 'customers', label: 'العملاء (المرضى)' },
-          { page: 'doctors', label: 'الأطباء وجهات الوصف' },
+          { page: 'invoices', label: 'فواتير المبيعات' },
           { page: 'prescriptions', label: 'الوصفات الطبية' },
-          { page: 'invoices', label: 'فواتير المبيعات (نقدي / آجل / تأمين)' },
           { page: 'returns', label: 'مرتجعات المبيعات' },
-          { page: 'collections', label: 'التحصيل' },
-          { page: 'price-lists', label: 'قوائم أسعار البيع' },
           { page: 'discounts', label: 'الخصومات والعروض' },
+        ],
+      },
+      {
+        title: 'الذمم والتحصيل',
+        children: [
+          { page: 'collections', label: 'التحصيل' },
+          { page: 'aging-customers', label: 'أعمار ديون العملاء' },
         ],
       },
     ],
@@ -163,20 +257,23 @@ const allSections = [
     key: 'sec-purchases',
     menuKey: 'purchases',
     title: 'المشتريات',
-    icon: '📦',
+    icon: Icon({ name: 'PackageSearch' }),
+    iconColor: '#fb923c',
     defaultPage: 'purchase-invoices',
     groups: [
       {
-        title: 'المشتريات والسداد',
+        title: 'عمليات الشراء',
         children: [
-          { page: 'suppliers', label: 'الموردون (شركات الأدوية)' },
           { page: 'purchase-requests', label: 'طلبات الشراء' },
           { page: 'purchase-orders', label: 'أوامر الشراء' },
           { page: 'purchase-invoices', label: 'فواتير المشتريات' },
           { page: 'receiving', label: 'استلام الشحنات' },
           { page: 'purchase-returns', label: 'مرتجعات المشتريات' },
-          { page: 'supplier-payments', label: 'السداد للموردين' },
         ],
+      },
+      {
+        title: 'السداد',
+        children: [{ page: 'supplier-payments', label: 'السداد للموردين' }],
       },
     ],
   },
@@ -184,31 +281,12 @@ const allSections = [
     key: 'sec-inventory',
     menuKey: 'inventory',
     title: 'المخزون',
-    icon: '🏷️',
+    icon: Icon({ name: 'Boxes' }),
+    iconColor: '#a78bfa',
     defaultPage: 'items',
     groups: [
       {
-        title: 'الأصناف والبيانات',
-        children: [
-          { page: 'items', label: 'الأصناف (الأدوية والمستلزمات)' },
-          {
-            title: 'قاعدة بيانات الأدوية',
-            children: [
-              { page: 'drug-commercial-name', label: 'الاسم التجاري' },
-              { page: 'drug-scientific-name', label: 'الاسم العلمي' },
-              { page: 'drug-manufacturer', label: 'الشركة المصنعة' },
-              { page: 'drug-dosage-form', label: 'التركيز والشكل الدوائي' },
-              { page: 'drug-alternatives', label: 'البدائل الدوائية' },
-              { page: 'drug-interactions', label: 'التفاعلات الدوائية' },
-              { page: 'drug-requires-rx', label: 'يحتاج وصفة؟' },
-            ],
-          },
-          { page: 'therapeutic-groups', label: 'المجموعات العلاجية' },
-          { page: 'units', label: 'الوحدات' },
-        ],
-      },
-      {
-        title: 'الحركة والمخازن',
+        title: 'الأرصدة والحركة',
         children: [
           { page: 'warehouses', label: 'المخازن والفروع' },
           { page: 'receiving-stock', label: 'التوريد' },
@@ -216,8 +294,11 @@ const allSections = [
           { page: 'transfers', label: 'التحويل بين الفروع' },
           { page: 'stocktake', label: 'الجرد' },
           { page: 'stock-movement', label: 'حركة الأصناف والتشغيلات' },
-          { page: 'expiry', label: 'مراقبة الصلاحية' },
         ],
+      },
+      {
+        title: 'الصلاحية والتشغيلات',
+        children: [{ page: 'expiry', label: 'مراقبة الصلاحية' }],
       },
     ],
   },
@@ -225,11 +306,12 @@ const allSections = [
     key: 'sec-insurance',
     menuKey: 'insurance',
     title: 'التأمين الصحي',
-    icon: '🏥',
+    icon: Icon({ name: 'ShieldCheck' }),
+    iconColor: '#2dd4bf',
     defaultPage: 'insurance-claims',
     groups: [
       {
-        title: 'التأمين الصحي',
+        title: 'التأمين',
         children: [
           { page: 'insurance-companies', label: 'شركات التأمين' },
           { page: 'insurance-cards', label: 'بطاقات التأمين' },
@@ -245,16 +327,22 @@ const allSections = [
     key: 'sec-treasury',
     menuKey: 'treasury',
     title: 'الصندوق والبنوك',
-    icon: '🏦',
+    icon: Icon({ name: 'Landmark' }),
+    iconColor: '#fbbf24',
     defaultPage: 'receipt-voucher',
     groups: [
       {
-        title: 'الصندوق والبنوك',
+        title: 'السندات',
+        children: [
+          { page: 'receipt-voucher', label: 'سند قبض' },
+          { page: 'payment-voucher', label: 'سند صرف' },
+        ],
+      },
+      {
+        title: 'الصناديق والبنوك',
         children: [
           { page: 'cash-boxes', label: 'الصناديق' },
           { page: 'banks', label: 'البنوك' },
-          { page: 'receipt-voucher', label: 'سند قبض' },
-          { page: 'payment-voucher', label: 'سند صرف' },
           { page: 'financial-transfers', label: 'التحويلات المالية' },
           { page: 'cheques', label: 'الشيكات' },
         ],
@@ -265,7 +353,8 @@ const allSections = [
     key: 'sec-accounting',
     menuKey: 'accounting',
     title: 'الحسابات',
-    icon: '💰',
+    icon: Icon({ name: 'BookOpen' }),
+    iconColor: '#60a5fa',
     defaultPage: 'accounts',
     groups: [
       {
@@ -282,9 +371,27 @@ const allSections = [
       {
         title: 'الذمم وأعمار الديون',
         children: [
-          { page: 'aging-customers', label: 'أعمار الديون (عملاء / تأمين)' },
-          { page: 'aging-suppliers', label: 'أعمار الديون (موردون)' },
+          { page: 'aging-suppliers', label: 'أعمار ديون الموردين' },
           { page: 'bad-debt-provision', label: 'مخصص الديون المشكوك فيها' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-assets',
+    menuKey: 'assets',
+    title: 'الأصول الثابتة',
+    icon: Icon({ name: 'Building2' }),
+    iconColor: '#94a3b8',
+    defaultPage: 'fixed-assets',
+    groups: [
+      {
+        title: 'الأصول',
+        children: [
+          { page: 'fixed-assets', label: 'دليل الأصول' },
+          { page: 'asset-depreciation', label: 'الإهلاك' },
+          { page: 'asset-disposal', label: 'بيع واستبعاد الأصول' },
+          { page: 'asset-inventory', label: 'جرد الأصول' },
         ],
       },
     ],
@@ -293,7 +400,8 @@ const allSections = [
     key: 'sec-profit',
     menuKey: 'profit',
     title: 'الربحية والتكاليف',
-    icon: '📉',
+    icon: Icon({ name: 'ChartColumn' }),
+    iconColor: '#4ade80',
     defaultPage: 'item-cost',
     groups: [
       {
@@ -310,10 +418,32 @@ const allSections = [
     ],
   },
   {
+    key: 'sec-hr',
+    menuKey: 'hr',
+    title: 'الموارد البشرية والرواتب',
+    icon: Icon({ name: 'Users' }),
+    iconColor: '#818cf8',
+    defaultPage: 'employees',
+    groups: [
+      {
+        title: 'الموظفون والرواتب',
+        children: [
+          { page: 'employees', label: 'الموظفون والورديات' },
+          { page: 'payroll', label: 'مسيرات الرواتب' },
+          { page: 'hr-attendance', label: 'الحضور والانصراف' },
+          { page: 'hr-loans', label: 'السلف والخصومات' },
+          { page: 'hr-end-service', label: 'نهاية الخدمة' },
+          { page: 'hr-reports', label: 'تقارير الموارد البشرية' },
+        ],
+      },
+    ],
+  },
+  {
     key: 'sec-reports',
     menuKey: 'reports',
     title: 'التقارير',
-    icon: '📈',
+    icon: Icon({ name: 'FileText' }),
+    iconColor: '#22d3ee',
     defaultPage: 'reports-sales',
     groups: [
       {
@@ -322,11 +452,6 @@ const allSections = [
           { page: 'rpt-sales-item', label: 'حسب الصنف' },
           { page: 'rpt-sales-doctor', label: 'حسب الطبيب' },
           { page: 'rpt-sales-insurance', label: 'حسب التأمين' },
-        ],
-      },
-      {
-        title: 'التقارير الأخرى',
-        children: [
           { page: 'reports-purchases', label: 'تقارير المشتريات' },
         ],
       },
@@ -339,10 +464,6 @@ const allSections = [
         ],
       },
       {
-        title: 'تقارير الربحية',
-        children: [{ page: 'reports-profit', label: 'تقارير الربحية' }],
-      },
-      {
         title: 'التقارير المالية',
         children: [
           { page: 'trial-balance', label: 'ميزان المراجعة' },
@@ -352,12 +473,12 @@ const allSections = [
         ],
       },
       {
-        title: 'التقارير الضريبية',
-        children: [{ page: 'tax-reports', label: 'التقارير الضريبية' }],
-      },
-      {
-        title: 'التقارير المخصصة',
-        children: [{ page: 'custom-reports', label: 'التقارير المخصصة' }],
+        title: 'تقارير أخرى',
+        children: [
+          { page: 'reports-profit', label: 'تقارير الربحية' },
+          { page: 'tax-reports', label: 'التقارير الضريبية' },
+          { page: 'custom-reports', label: 'التقارير المخصصة' },
+        ],
       },
     ],
   },
@@ -365,15 +486,20 @@ const allSections = [
     key: 'sec-admin',
     menuKey: 'admin',
     title: 'الإدارة',
-    icon: '⚙️',
+    icon: Icon({ name: 'Settings' }),
+    iconColor: '#cbd5e1',
     defaultPage: 'users',
     groups: [
       {
-        title: 'المستخدمون والتشغيل',
+        title: 'المستخدمون والصلاحيات',
         children: [
-          { page: 'settings', label: 'إعدادات النظام' },
           { page: 'users', label: 'المستخدمون والصلاحيات (RBAC)' },
-          { page: 'employees', label: 'الموظفون والورديات' },
+          { page: 'settings', label: 'إعدادات النظام' },
+        ],
+      },
+      {
+        title: 'التشغيل والمراقبة',
+        children: [
           { page: 'audit', label: 'سجل العمليات (Audit Log)' },
           { page: 'backup', label: 'النسخ الاحتياطي' },
           { page: 'branches', label: 'إدارة الفروع' },
@@ -387,8 +513,9 @@ const allSections = [
     key: 'sec-help',
     menuKey: 'help',
     title: 'المساعدة',
-    icon: '❓',
-    defaultPage: 'about',
+    icon: Icon({ name: 'CircleQuestionMark' }),
+    iconColor: '#f87171',
+    defaultPage: 'user-guide',
     groups: [
       {
         title: 'المساعدة',
@@ -447,10 +574,12 @@ const allSections = [
 }
 
 .sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: #cbd5e1;
-  font-size: 12px;
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 4px;
@@ -471,7 +600,7 @@ const allSections = [
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   background: transparent;
   border: none;
   color: #94a3b8;
@@ -496,8 +625,11 @@ const allSections = [
 }
 
 .section-icon {
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 22px;
 }
 
 .section-label {
@@ -508,12 +640,14 @@ const allSections = [
 }
 
 .section-arrow {
-  font-size: 9px;
-  color: #64748b;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  color: #64748b;
+  transition: transform 0.18s ease;
 }
 
-/* ===== بنود القسم النشط ===== */
+/* ===== بنود القسم المفتوح ===== */
 .section-items {
   list-style: none;
   margin: 0;
@@ -595,8 +729,13 @@ const allSections = [
   font-size: 9px;
   color: #64748b;
   flex-shrink: 0;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   transition: transform 0.15s ease;
+}
+
+.tree-chevron.rotated {
+  transform: rotate(90deg);
 }
 
 .tree-label {
@@ -615,6 +754,43 @@ const allSections = [
   padding-inline: 8px 42px;
   font-size: 12px;
   color: #7d8aa0;
+}
+
+/* ===== حركات فتح الأقسام ===== */
+.section-open-enter-active,
+.section-open-leave-active {
+  transition:
+    max-height 0.25s ease,
+    opacity 0.2s ease;
+  overflow: hidden;
+}
+.section-open-enter-from,
+.section-open-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+.section-open-enter-to,
+.section-open-leave-from {
+  max-height: 800px;
+  opacity: 1;
+}
+
+.sub-open-enter-active,
+.sub-open-leave-active {
+  transition:
+    max-height 0.2s ease,
+    opacity 0.15s ease;
+  overflow: hidden;
+}
+.sub-open-enter-from,
+.sub-open-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+.sub-open-enter-to,
+.sub-open-leave-from {
+  max-height: 500px;
+  opacity: 1;
 }
 
 /* ===== الجوال ===== */

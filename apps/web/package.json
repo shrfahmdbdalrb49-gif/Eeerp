@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "dexie": "^3.2.7",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^2.1.0",
     "vue": "^3.4.0"
   },
