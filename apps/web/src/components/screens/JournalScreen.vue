@@ -86,6 +86,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db, activeAccounts } from '../../db/database.js'
+import { apiFetch } from '../../db/api.js'
+import { getStorageMode } from '../../db/storage.js'
 import { fmt, trialBalance, postManualJournal } from '../../db/engine.js'
 import { requirePermission } from '../../db/session.js'
 
@@ -120,6 +122,28 @@ function refLabel(kind) {
 
 async function loadData() {
   accounts.value = (await activeAccounts()).sort((a, b) => a.code.localeCompare(b.code, 'ar'))
+  if (getStorageMode() === 'server') {
+    try {
+      const j = await apiFetch('/journals', { fallback: null })
+      if (j && Array.isArray(j)) {
+        entries.value = j.map(e => ({ ...e, refKind: e.ref_kind, createdBy: e.created_by }))
+        try {
+          const jl = await apiFetch('/journals-lines', { fallback: null })
+          if (jl && Array.isArray(jl)) {
+            entriesByLine.value = jl.map(l => ({ ...l, entryId: l.entry_id, debit: Number(l.debit), credit: Number(l.credit) }))
+          } else if (j.length) {
+            const detail = await apiFetch('/journals/' + j[0].id, { fallback: null })
+            entriesByLine.value = (detail?.lines || []).map(l => ({ ...l, entryId: detail.id, debit: Number(l.debit), credit: Number(l.credit) }))
+          } else {
+            entriesByLine.value = []
+          }
+        } catch { entriesByLine.value = [] }
+        const tb = await trialBalance()
+        balanced.value = tb.balanced !== undefined ? tb.balanced : Math.abs((tb.totalDebit || 0) - (tb.totalCredit || 0)) < 0.01
+        return
+      }
+    } catch {}
+  }
   entries.value = await db.journalEntries.toArray()
   entriesByLine.value = await db.journalLines.toArray()
   const tb = await trialBalance()

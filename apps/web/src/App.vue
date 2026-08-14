@@ -1,5 +1,10 @@
 <template>
   <div class="erp-app">
+    <!-- شارة وضع الاستعراض: تُعرض في النسخة المُنشورة على GitHub Pages حيث لا يوجد خادم خلفي -->
+    <div v-if="isDemoMode && !demoBannerDismissed" class="demo-banner">
+      <span>◉ وضع الاستعراض (Demo) — البيانات تُخزّن محليًا في جهازك ولا تُزامن مع خادم مركزي</span>
+      <button class="demo-banner-dismiss" title="إخفاء" @click="dismissDemoBanner">✕</button>
+    </div>
     <!-- شاشة تسجيل الدخول تُعرض قبل كل شيء حتى المصادقة الفعلية -->
     <LoginScreen v-if="!authenticated" @logged-in="onLoggedIn" />
     <template v-else>
@@ -41,7 +46,7 @@
       >
         <!-- محتوى النوافذ الداخلية -->
         <template #sales-invoice="{ window: win }">
-          <SalesInvoiceScreen />
+          <SalesInvoiceScreen :window-id="win.id" :active="activeWindowId === win.id" />
         </template>
         <template #pos>
           <PosScreen />
@@ -88,14 +93,17 @@
         <template #reports>
           <ReportsScreen />
         </template>
-        <template #purchases>
-          <PurchasesScreen />
+        <template #purchases="{ window: win }">
+          <PurchasesScreen :window-id="win.id" :active="activeWindowId === win.id" />
         </template>
-        <template #supplier-payments>
-          <SupplierPaymentsScreen />
+        <template #supplier-payments="{ window: win }">
+          <SupplierPaymentsScreen :window-id="win.id" :active="activeWindowId === win.id" />
         </template>
-        <template #receipt-voucher>
-          <ReceiptVoucherScreen />
+        <template #receipt-voucher="{ window: win }">
+          <ReceiptVoucherScreen :window-id="win.id" :active="activeWindowId === win.id" />
+        </template>
+        <template #payment-voucher="{ window: win }">
+          <PaymentVoucherScreen :window-id="win.id" :active="activeWindowId === win.id" />
         </template>
         <template #users>
           <UsersScreen />
@@ -144,6 +152,7 @@ import CollectionsScreen from './components/screens/CollectionsScreen.vue'
 import SuppliersScreen from './components/screens/SuppliersScreen.vue'
 import ExpiryScreen from './components/screens/ExpiryScreen.vue'
 import ReceiptVoucherScreen from './components/screens/ReceiptVoucherScreen.vue'
+import PaymentVoucherScreen from './components/screens/PaymentVoucherScreen.vue'
 import AccountsScreen from './components/screens/AccountsScreen.vue'
 import TransfersScreen from './components/screens/TransfersScreen.vue'
 import UsersScreen from './components/screens/UsersScreen.vue'
@@ -154,6 +163,13 @@ import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
 // ---- المصادقة ----
 const authenticated = ref(null) // null = جارٍ التحقق، false = غير مسجل
 const currentUser = ref(null)
+// شارة وضع الاستعراض (تُخفى بالضغط على ✕ لكل مستخدم)
+const isDemoMode = ref(false)
+const demoBannerDismissed = ref(localStorage.getItem('sharaf-demo-banner-dismissed') === '1')
+function dismissDemoBanner() {
+  localStorage.setItem('sharaf-demo-banner-dismissed', '1')
+  demoBannerDismissed.value = true
+}
 
 const activeMenu = ref('dashboard')
 const sidebarCollapsed = ref(window.innerWidth <= 768)
@@ -170,7 +186,8 @@ const pageWindowTypes = {
   doctors: { type: 'doctors', title: 'الأطباء' },
   items: { type: 'items', title: 'الأصناف - الأدوية والمستلزمات' },
   dashboard: { type: 'dashboard', title: 'لوحة التحكم' },
-  invoices: { type: 'invoices', title: 'فواتير المبيعات' },
+  invoices: { type: 'sales-invoice', title: 'فواتير المبيعات (نقدي / آجل / تأمين)' },
+  'sales-invoices': { type: 'sales-invoice', title: 'فواتير المبيعات (نقدي / آجل / تأمين)' },
   prescriptions: { type: 'prescriptions', title: 'الوصفات الطبية' },
   returns: { type: 'returns', title: 'مرتجعات المبيعات' },
   collections: { type: 'collections', title: 'التحصيل' },
@@ -228,7 +245,7 @@ const pageWindowTypes = {
   'cash-boxes': { type: 'generic', title: 'الصناديق' },
   banks: { type: 'generic', title: 'البنوك' },
   'receipt-voucher': { type: 'receipt-voucher', title: 'سند قبض' },
-  'payment-voucher': { type: 'generic', title: 'سند صرف' },
+  'payment-voucher': { type: 'payment-voucher', title: 'سند صرف' },
   'financial-transfers': { type: 'generic', title: 'التحويلات المالية' },
   cheques: { type: 'generic', title: 'الشيكات' },
   'opening-entries': { type: 'journal', title: 'القيود الافتتاحية' },
@@ -455,6 +472,23 @@ onMounted(async () => {
   // تهيئة قاعدة البيانات (المستخدم الافتراضي + دليل الحسابات) ثم التحقق من الجلسة
   const { initSystem, getStorageMode } = await import('./db/database.js')
   const { currentSession } = await import('./db/session.js')
+  // وضع الاستعراض الذكي: إذا كان الخادم غير متاح (نشر GitHub Pages) يتحول تلقائيًا للتخزين المحلي
+  const { ensureDemoMode } = await import('./db/demoMode.js')
+  await ensureDemoMode()
+  /* ترقية البيانات القديمة من النسخ السابقة تلقائيًا:
+     - تحويل أسماء الحقول من snake_case إلى camelCase
+     - إضافة كلمات مرور مشفرة للمستخدمين القدامى
+     بدون هذه الترقية يظهر «كلمة المرور غير صحيحة» وتحمل الشاشات بيانات غير متوافقة */
+  try {
+    const { db } = await import('./db/database.js')
+    const { migrateLegacyData } = await import('./db/migration.js')
+    const result = await migrateLegacyData(db)
+    if (result?.migrated) console.info('[SharafERP] رُقّيت البيانات القديمة:', result.tables?.length || 0, 'جدولًا')
+  } catch (e) {
+    console.warn('[SharafERP] تعذّرت ترقية البيانات القديمة:', e?.message)
+  }
+  /* شارة وضع الاستعراض */
+  if (getStorageMode() === 'local') isDemoMode.value = true
   if (getStorageMode() === 'server') {
     // في وضع الخادم المركزي: التحقق من الاتصال بالخادم قبل استكمال التحميل
     const { apiBase } = await import('./db/api.js')
@@ -463,9 +497,8 @@ onMounted(async () => {
       try { const r = await fetch(url, { signal: AbortSignal.timeout(6000) }); ok = r.ok || r.status === 401; if (ok) break } catch {}
     }
     if (!ok) console.warn('[SharafERP] الخادم المركزي غير متاح على', apiBase(), '— لن تعمل العمليات حتى يصبح متصلًا')
-  } else {
-    await initSystem()
   }
+  await initSystem()
   const session = await currentSession()
   authenticated.value = !!session
   currentUser.value = session
@@ -484,12 +517,19 @@ onUnmounted(() => {
 
 // ---- الإجراءات ----
 function handleNew() {
+  // الشاشات المعاد تصميمها (بواجهة Desktop ERP) تفتح نموذجًا جديدًا داخل نفس النافذة
+  const DOC_SCREEN_TYPES = ['purchases', 'sales-invoice', 'receipt-voucher', 'payment-voucher', 'supplier-payments']
+  const activeWin = openWindows.value.find((w) => w.id === activeWindowId.value)
+  if (activeWin && DOC_SCREEN_TYPES.includes(activeWin.type)) {
+    window.dispatchEvent(new CustomEvent('sharaf-new-doc', { detail: { windowId: activeWindowId.value } }))
+    return
+  }
   const newId = 'win-' + Date.now()
   openWindows.value.push({
     id: newId,
-    title: 'نقطة البيع POS',
-    type: 'pos',
-    page: 'pos',
+    title: activeWin ? activeWin.title : 'نقطة البيع POS',
+    type: activeWin ? activeWin.type : 'pos',
+    page: activeWin ? (activeWin.page || activeWin.type) : 'pos',
     status: 'draft',
     minimized: false,
     maximized: false
@@ -558,5 +598,36 @@ function maximizeWindow(id) {
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+
+/* شارة وضع الاستعراض */
+.demo-banner {
+  background: linear-gradient(90deg, #b45309 0%, #d97706 50%, #b45309 100%);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  padding: 6px 36px 6px 12px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+  direction: rtl;
+}
+.demo-banner-dismiss {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.demo-banner-dismiss:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 </style>

@@ -15,7 +15,7 @@ export async function serverPostPurchase({ supplierId, date, lines, paymentType,
     body: JSON.stringify({
       supplierId, invoiceDate: date || today(), paymentType: paymentType || 'credit',
       paidAmount: paidAmount == null ? 0 : Number(paidAmount), discount: discount || 0, tax: tax || 0, notes: notes || null,
-      lines: lines.map(l => ({ itemId: l.itemId, qty: Number(l.qty), unitCost: Number(l.cost ?? l.unitCost ?? 0), discount: 0, tax: 0, subtotal: Number(l.qty) * Number(l.cost ?? l.unitCost ?? 0), batchNo: l.batchNo || null, expiryDate: l.expDate || l.expiryDate || null })),
+      lines: lines.map(l => ({ itemId: l.itemId, qty: Number(l.qty), bonus: Number(l.bonus || 0), unitCost: Number(l.cost ?? l.unitCost ?? 0), discount: 0, tax: 0, subtotal: Number(l.qty) * Number(l.cost ?? l.unitCost ?? 0), batchNo: l.batchNo || null, expiryDate: l.expDate || l.expiryDate || null })),
     }),
   })
 }
@@ -41,10 +41,10 @@ export async function serverPostCollection({ customerId, amount, method, date, r
 }
 
 /* ---------- السداد للموردين ---------- */
-export async function serverPostSupplierPayment({ supplierId, amount, method, date, referenceNo, notes }) {
+export async function serverPostSupplierPayment({ supplierId, amount, method, date, referenceNo, notes, operationType, accountKey }) {
   return await apiFetch('/supplier-payments', {
     method: 'POST',
-    body: JSON.stringify({ supplierId, amount: Number(amount), method: method || 'cash', paymentDate: date || today(), referenceNo: referenceNo || null, notes: notes || null }),
+    body: JSON.stringify({ supplierId: supplierId != null ? Number(supplierId) : null, amount: Number(amount), method: method || 'cash', paymentDate: date || today(), referenceNo: referenceNo || null, notes: notes || null, operationType: operationType || null, accountKey: accountKey || null }),
   })
 }
 
@@ -74,7 +74,7 @@ export async function serverCreatePurchaseDraft({ supplierId, date, lines, payme
     body: JSON.stringify({
       supplierId, invoiceDate: date || today(), paymentType: paymentType || 'credit',
       notes: notes || null,
-      lines: lines.map(l => ({ itemId: l.itemId, qty: Number(l.qty), unitCost: Number(l.cost ?? l.unitCost ?? 0), discount: 0, tax: 0, subtotal: Number(l.qty) * Number(l.cost ?? l.unitCost ?? 0), expiryDate: l.expDate || l.expiryDate || null })),
+      lines: lines.map(l => ({ itemId: l.itemId, qty: Number(l.qty), bonus: Number(l.bonus || 0), unitCost: Number(l.cost ?? l.unitCost ?? 0), discount: 0, tax: 0, subtotal: Number(l.qty) * Number(l.cost ?? l.unitCost ?? 0), expiryDate: l.expDate || l.expiryDate || null })),
     }),
   })
 }

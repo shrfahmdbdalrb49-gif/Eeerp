@@ -180,17 +180,23 @@ export function isActive(record) {
   if (record && (record.active === 1 || record.active === true)) return true
   return false
 }
+function dedupeById(rows) {
+  const seen = new Map()
+  for (const r of rows) if (!seen.has(r.id)) seen.set(r.id, r)
+  return Array.from(seen.values())
+}
 export async function activeItems() {
-  return (await db.items.toArray()).filter(isActive)
+  return dedupeById((await db.items.toArray()).filter(isActive))
 }
 export async function activeCustomers() {
-  return (await db.customers.toArray()).filter(isActive).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'))
+  return dedupeById((await db.customers.toArray()).filter(isActive)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'))
 }
 export async function activeSuppliers() {
-  return (await db.suppliers.toArray()).filter(isActive).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'))
+  return dedupeById((await db.suppliers.toArray()).filter(isActive)).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'))
 }
 export async function activeAccounts() {
   return (await db.chartOfAccounts.toArray()).filter(isActive)
 }
+export { sysAccountsList } from './engine.js'
 export default db
 export { db }

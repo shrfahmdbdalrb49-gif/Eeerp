@@ -286,6 +286,15 @@ export async function sysAccounts() {
   }
 }
 
+/* ---------- قائمة الحسابات كاملة (لحجز قيد بمصاريف/حساب محدد) ---------- */
+export async function sysAccountsList() {
+  if (isServer()) {
+    const all = await apiFetch('/accounts')
+    return Array.isArray(all) ? all : []
+  }
+  return await db.chartOfAccounts.toArray()
+}
+
 /* ---------- قيد بيع: الصندوق/الذمم ← إيرادات + تكلفة مبيعات ← مخزون ---------- */
 export async function postSaleJournal({ saleId, total, paid, customerPaid, cogsAmount }) {
   const sys = await sysAccounts()
@@ -336,9 +345,21 @@ export async function postReturnJournal({ returnId, total, refundMethod }) {
 }
 
 /* ---------- قيد سداد مورد: ذمم دائنة ← صندوق/بنك ---------- */
-export async function postSupplierPaymentJournal({ paymentId, amount, method }) {
+export async function postSupplierPaymentJournal({ paymentId, amount, method, operationType, expenseAccountKey }) {
   const sys = await sysAccounts()
-  const lines = [
+  let lines
+  if (operationType === 'expense' && expenseAccountKey) {
+    const accs = await sysAccountsList()
+    const acc = accs.find(a => a.code === expenseAccountKey && a.active)
+    if (!acc) throw new Error(`حساب المصاريف ${expenseAccountKey} غير موجود`)
+    lines = [
+      { accountId: acc.id, debit: amount },
+      { accountId: method === 'bank' ? sys.bank : sys.cash, credit: amount },
+    ]
+    await postJournalEntry({ date: new Date().toISOString().slice(0, 10), description: `قيد مصروفات #${paymentId}`, refKind: 'supplierPayment', refId: paymentId, lines })
+    return
+  }
+  lines = [
     { accountId: sys.payables, debit: amount },
     { accountId: method === 'bank' ? sys.bank : sys.cash, credit: amount },
   ]
