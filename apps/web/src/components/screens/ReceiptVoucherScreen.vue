@@ -359,9 +359,12 @@ async function save() {
       await loadData()
       return
     }
+    const { nextDocNo } = await import('../../db/sequences.js')
+    const voucherNo = await nextDocNo('receipt', new Date(f.date).getFullYear())
     const id = await db.collections.add({
       customerId: f.customerId, date: f.date, method: f.method, amount: f.amount,
       referenceNo: f.referenceNo || null, notes: f.notes, status: 'posted', createdAt: Date.now(),
+      voucher_no: voucherNo,
     })
     await postCollectionJournal({ collectionId: id, amount: f.amount, method: f.method })
     const s = await currentSession()

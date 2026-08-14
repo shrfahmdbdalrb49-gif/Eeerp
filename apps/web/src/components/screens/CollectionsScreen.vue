@@ -177,9 +177,12 @@ async function save() {
     const debtor = debtors.value.find(c => c.id === f.customerId)
     if (!debtor) throw new Error('العميل لا يملك ذمم مستحقة')
     if (f.amount > debtor.balance + 0.005) throw new Error(`المبلغ أكبر من ذمم العميل (${fmt(debtor.balance)})`)
+    const { nextDocNo } = await import('../../db/sequences.js')
+    const voucherNo = await nextDocNo('receipt', new Date(f.date).getFullYear())
     const id = await db.collections.add({
       customerId: f.customerId, date: f.date, method: f.method, amount: f.amount,
       notes: f.notes, status: 'posted', createdAt: Date.now(),
+      voucher_no: voucherNo,
     })
     await postCollectionJournal({ collectionId: id, amount: f.amount, method: f.method })
     const s = await currentSession()

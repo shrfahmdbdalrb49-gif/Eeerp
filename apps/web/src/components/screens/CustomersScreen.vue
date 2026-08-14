@@ -12,7 +12,7 @@
           <tr>
             <th style="width:45px">#</th><th style="width:75px">الكود</th><th>الاسم</th><th style="width:120px">الهاتف</th>
             <th style="width:100px">عدد الفواتير</th><th style="width:105px">إجمالي مبيعات</th><th style="width:105px">المحصَّل</th>
-            <th style="width:110px">الرصيد الآجل</th><th style="width:65px">الحالة</th><th style="width:52px"></th>
+            <th style="width:110px">الرصيد الآجل</th><th style="width:110px">الحد الائتماني</th><th style="width:65px">الحالة</th><th style="width:52px"></th>
           </tr>
         </thead>
         <tbody>
@@ -25,11 +25,12 @@
             <td class="num">{{ fmt(c.totalSales) }}</td>
             <td class="num">{{ fmt(c.totalCollected) }}</td>
             <td class="num"><b :class="c.balance > 0 ? 'balance-due' : ''">{{ fmt(c.balance) }}</b></td>
+            <td class="num">{{ (c.creditLimit || 0) > 0 ? fmt(c.creditLimit) : '∞' }}</td>
             <td><span class="status-chip" :class="c.status === 'active' ? 'ok' : 'off'">{{ c.status === 'active' ? 'نشط' : 'معطَّل' }}</span></td>
             <td><button class="delete-btn" @click="handleDelete(c)">{{ c.hasSales ? '🔒' : '✕' }}</button></td>
           </tr>
           <tr v-if="filtered.length === 0">
-            <td colspan="10" class="empty-state">لا يوجد عملاء بعد — أنشئ أول عميل. لا توجد بيانات وهمية.</td>
+            <td colspan="11" class="empty-state">لا يوجد عملاء بعد — أنشئ أول عميل. لا توجد بيانات وهمية.</td>
           </tr>
         </tbody>
       </table>
@@ -43,6 +44,7 @@
           <div class="field-row"><label>الاسم *</label><input type="text" class="input-field" v-model="form.name" /></div>
           <div class="field-row"><label>الهاتف</label><input type="text" class="input-field" v-model="form.phone" /></div>
           <div class="field-row"><label>ملاحظات</label><input type="text" class="input-field" v-model="form.notes" /></div>
+          <div class="field-row"><label>الحد الائتماني</label><input type="number" min="0" step="0.01" class="input-field num" v-model.number="form.creditLimit" placeholder="0 أو فارغ = غير محدود" /><span class="field-hint" style="font-size:11px;color:var(--color-text-secondary)">يُطبق على البيع الآجل فقط</span></div>
         </div>
         <div class="form-actions">
           <span v-if="formError" class="form-error">{{ formError }}</span>
@@ -66,7 +68,7 @@ const showForm = ref(false)
 const editing = ref(null)
 const saving = ref(false)
 const formError = ref('')
-const form = ref({ code: '', name: '', phone: '', notes: '' })
+const form = ref({ code: '', name: '', phone: '', notes: '', creditLimit: null })
 
 async function enrichCustomer(c) {
   const invoices = await db.salesInvoices.where('customerId').equals(c.id).toArray()
@@ -93,8 +95,8 @@ function openForm(c) {
   editing.value = c ? c.id : null
   formError.value = ''
   form.value = c
-    ? { code: c.code, name: c.name, phone: c.phone || '', notes: c.notes || '' }
-    : { code: '', name: '', phone: '', notes: '' }
+    ? { code: c.code, name: c.name, phone: c.phone || '', notes: c.notes || '', creditLimit: c.creditLimit || null }
+    : { code: '', name: '', phone: '', notes: '', creditLimit: null }
   showForm.value = true
 }
 

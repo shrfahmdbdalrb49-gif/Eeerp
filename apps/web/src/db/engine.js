@@ -146,6 +146,16 @@ export async function postJournalEntry({ date, description, refKind, refId, line
     if ((Number(l.debit) || 0) < 0 || (Number(l.credit) || 0) < 0) throw new Error('قيم سالبة غير مسموحة')
     if ((Number(l.debit) || 0) === 0 && (Number(l.credit) || 0) === 0) throw new Error('سطر بقيمة صفرية')
   }
+  /* ترقيم آمن لأرقام القيود المحاسبية */
+  let entryNo = null
+  try {
+    const { nextDocNo } = await import('./sequences.js')
+    const entryDate = date || new Date().toISOString().slice(0, 10)
+    entryNo = await nextDocNo('journal', new Date(entryDate).getFullYear())
+  } catch (e) {
+    // فشل التتابع غير حرج: القيد يُنشأ بلا رقم ظاهري (يُعرض برقمه التسلسلي)
+    entryNo = null
+  }
   const entryId = await db.journalEntries.add({
     date: date || new Date().toISOString().slice(0, 10),
     description: description || '',
@@ -153,6 +163,7 @@ export async function postJournalEntry({ date, description, refKind, refId, line
     refId: refId || null,
     posted: true,
     createdAt: Date.now(),
+    entry_no: entryNo,
   })
   await db.journalLines.bulkAdd(
     lines.map(l => ({ entryId, accountId: l.accountId, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0 }))
@@ -332,6 +343,82 @@ export async function postCollectionJournal({ collectionId, amount, method }) {
     { accountId: sys.receivables, credit: amount },
   ]
   await postJournalEntry({ date: new Date().toISOString().slice(0, 10), description: `قيد تحصيل #${collectionId}`, refKind: 'collection', refId: collectionId, lines })
+}
+
+/* ---------- إلغاء فاتورة بيع (soft delete حقيقي في local mode): عكس المخزون والقيود ---------- */
+export async function cancelSaleLocal(saleId) {
+  const sale = await db.salesInvoices.get(saleId)
+  if (!sale) throw new Error('الفاتورة غير موجودة')
+  if (sale.status === 'cancelled') return
+  /* 1. منع الإلغاء إذا كان هناك تحصيلات مرتبطة (يجب عكسها يدويًا أولًا) */
+  const cols = await db.collections.where('customerId').equals(sale.customerId).toArray()
+  const totalCollected = cols.reduce((s, x) => s + (x.amount || 0), 0)
+  if (totalCollected > 0.005) {
+    throw new Error('لا يمكن إلغاء الفاتورة: توجد تحصيلات مرتبطة بالعميل — أَلغِها أو عدّلها أولًا')
+  }
+  /* 2. عكس قيد البيع */
+  const jeIds = (await db.journalEntries.where('refKind').equals('sale').and(j => j.refId === saleId).toArray()).map(j => j.id)
+  for (const jeId of jeIds) {
+    await db.journalLines.where('entryId').equals(jeId).delete()
+    await db.journalEntries.delete(jeId)
+  }
+  /* 3. استرجاع الكميات إلى التشغيلات (عكس FEFO الاستهلاك) */
+  const lines = await db.salesLines.where('invoiceId').equals(saleId).toArray()
+  for (const l of lines) {
+    const consumed = Array.isArray(l.batchIds) ? l.batchIds : (l.batchId ? [l.batchId] : [])
+    if (consumed.length === 0) continue
+    const perBatch = Number(l.qty) / consumed.length
+    for (const batchId of consumed) {
+      let batch = await db.batches.get(batchId)
+      if (!batch) {
+        // التشغيلة أُكلت بالكامل عند البيع — نعيد إنشاءها بنفس التكلفة
+        const cogsData = await computeCOGS(l.itemId, perBatch)
+        batch = { itemId: l.itemId, storeId: sale.storeId || 1, batchNo: `RST-${saleId}-${batchId}`, mfgDate: null, expDate: null, qty: perBatch, cost: cogsData.cogs / perBatch || 0, quarantined: false, createdAt: Date.now() }
+        await db.batches.add(batch)
+      } else {
+        await db.batches.update(batchId, { qty: (batch.qty || 0) + perBatch })
+      }
+      await db.stockMovements.add({
+        itemId: l.itemId, batchId: batch.id, kind: 'in', qty: perBatch, refKind: 'cancel', refId: saleId,
+        date: new Date().toISOString().slice(0, 10), createdAt: Date.now(),
+      })
+    }
+  }
+  await db.salesLines.where('invoiceId').equals(saleId).delete()
+  await db.salesInvoices.update(saleId, { status: 'cancelled', canceledAt: Date.now() })
+  await audit('sale_cancelled', 'sale', saleId, `إلغاء فاتورة البيع ${sale.invoice_no || saleId}`)
+}
+
+/* ---------- إلغاء فاتورة شراء (soft delete حقيقي في local mode) ---------- */
+export async function cancelPurchaseLocal(purchaseId) {
+  const inv = await db.purchaseInvoices.get(purchaseId)
+  if (!inv) throw new Error('الفاتورة غير موجودة')
+  if (inv.status === 'cancelled') return
+  const pays = await db.supplierPayments.where('supplierId').equals(inv.supplierId).toArray()
+  const totalPaid = pays.reduce((s, x) => s + (x.amount || 0), 0)
+  if (totalPaid > 0.005) {
+    throw new Error('لا يمكن إلغاء الفاتورة: توجد دفعات للمورد — عكسها أولًا')
+  }
+  const jeIds = (await db.journalEntries.where('refKind').equals('purchase').and(j => j.refId === purchaseId).toArray()).map(j => j.id)
+  for (const jeId of jeIds) {
+    await db.journalLines.where('entryId').equals(jeId).delete()
+    await db.journalEntries.delete(jeId)
+  }
+  const lines = await db.purchaseLines.where('invoiceId').equals(purchaseId).toArray()
+  for (const l of lines) {
+    const batch = await db.batches.get(l.batchId)
+    if (batch) {
+      await db.batches.update(l.batchId, { qty: Math.max(0, (batch.qty || 0) - (l.qty || 0)) })
+      if ((batch.qty || 0) - (l.qty || 0) <= 0) await db.batches.delete(l.batchId)
+      await db.stockMovements.add({
+        itemId: l.itemId, batchId: l.batchId, kind: 'out', qty: l.qty, refKind: 'cancel', refId: purchaseId,
+        date: new Date().toISOString().slice(0, 10), createdAt: Date.now(),
+      })
+    }
+  }
+  await db.purchaseLines.where('invoiceId').equals(purchaseId).delete()
+  await db.purchaseInvoices.update(purchaseId, { status: 'cancelled', canceledAt: Date.now() })
+  await audit('purchase_cancelled', 'purchase', purchaseId, `إلغاء فاتورة الشراء ${inv.invoice_no || purchaseId}`)
 }
 
 /* ---------- قيد مرتجع: مرتدات ← ذمم/صندوق ---------- */

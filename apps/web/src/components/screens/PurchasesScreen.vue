@@ -410,7 +410,7 @@ async function loadData() {
     return {
       ...inv,
       supplierId: inv.supplierId, date: inv.date, status: inv.status || 'posted',
-      paymentType: inv.paymentType, invoice_no: `P-${inv.id}`,
+      paymentType: inv.paymentType, invoice_no: inv.invoice_no || `P-${inv.id}`,
       linesCount: ils.length,
       totalQty: ils.reduce((s, l) => s + (l.qty || 0), 0),
       total: ils.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0),
@@ -468,9 +468,13 @@ async function saveInvoice(receiveImmediately = false) {
       return
     }
     const total = payload.lines.reduce((s, l) => s + l.qty * l.cost, 0)
+    /* ترقيم آمن لا يتكرر حتى تحت الضغط المتزامن */
+    const { nextDocNo } = await import('../../db/sequences.js')
+    const invoiceNo = await nextDocNo('purchase', new Date(payload.date).getFullYear())
     const invId = await db.purchaseInvoices.add({
       supplierId: payload.supplierId, date: payload.date, storeId: 1, paymentType: payload.paymentType,
       notes: payload.notes, status: 'posted', total, createdAt: Date.now(),
+      invoice_no: invoiceNo,
     })
     for (const l of payload.lines) {
       const batchId = await addBatch({
@@ -503,7 +507,9 @@ async function deleteInvoice(inv) {
       await loadData()
       return
     }
-    await serverCancelPurchase(inv.id)
+    /* إلغاء فعلي في الوضع المحلي: عكس القيود واسترجاع المخزون (soft delete) */
+    const { cancelPurchaseLocal } = await import('../../db/engine.js')
+    await cancelPurchaseLocal(inv.id)
     await loadData()
   } catch (e) {
     flash(e.message, 'cmd-error')

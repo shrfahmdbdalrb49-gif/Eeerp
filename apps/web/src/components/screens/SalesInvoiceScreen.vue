@@ -443,9 +443,24 @@ async function save() {
     }
     const total = netTotal.value
     const paid = f.paymentType === 'credit' ? 0 : total
+    /* ترقيم آمن لا يتكرر حتى تحت الضغط المتزامن */
+    const { nextDocNo } = await import('../../db/sequences.js')
+    const invoiceNo = await nextDocNo('sale', new Date(f.date).getFullYear())
+    /* حد ائتماني للعميل عند البيع الآجل */
+    if (f.paymentType === 'credit') {
+      const customer = await db.customers.get(f.customerId)
+      if (customer && (customer.creditLimit || 0) > 0) {
+        const pending = await db.salesInvoices.where('customerId').equals(f.customerId).and(i => i.status !== 'cancelled').toArray()
+        const owed = pending.reduce((s, i) => s + ((i.total || 0) - (i.paid || 0)), 0)
+        if (owed + total > customer.creditLimit) {
+          throw new Error(`تجاوز الحد الائتماني للعميل "${customer.name}" — المتبقي عليه ${fmt(owed)} + الفاتورة الجديدة ${fmt(total)} > الحد ${fmt(customer.creditLimit)}`)
+        }
+      }
+    }
     const saleId = await db.salesInvoices.add({
       customerId: f.customerId, date: f.date, storeId: 1,
       paymentType: f.paymentType, notes: f.notes || null, total, status: 'posted', createdBy: session.userId, createdAt: Date.now(),
+      invoice_no: invoiceNo,
     })
     for (const l of lines) {
       const { cogs } = await computeCOGS(l.itemId, l.qty)
@@ -483,7 +498,11 @@ async function cancelInvoice(inv) {
       flash('تم إلغاء الفاتورة', 'cmd-success')
       return
     }
-    flash('الإلغاء متاح في وضع الخادم فقط', 'cmd-error')
+    /* إلغاء فعلي في الوضع المحلي: عكس القيود واسترجاع المخزون (soft delete) */
+    const { cancelSaleLocal } = await import('../../db/engine.js')
+    await cancelSaleLocal(inv.id)
+    await loadData()
+    flash('تم إلغاء الفاتورة وعكس كل حركات المخزون والقيود', 'cmd-success')
   } catch (e) {
     flash(e.message, 'cmd-error')
   }

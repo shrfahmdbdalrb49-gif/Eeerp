@@ -150,17 +150,21 @@ async function checkout() {
       return
     }
     const paid = paymentType.value === 'credit' ? 0 : total
-
+    const saleDate = new Date().toISOString().slice(0, 10)
+    /* ترقيم آمن لا يتكرر حتى تحت الضغط المتزامن */
+    const { nextDocNo } = await import('../../db/sequences.js')
+    const invoiceNo = await nextDocNo('sale', new Date(saleDate).getFullYear())
     // 1. إنشاء فاتورة البيع
     const saleId = await db.salesInvoices.add({
       customerId: customerId.value,
-      date: new Date().toISOString().slice(0, 10),
+      date: saleDate,
       storeId: 1,
       paymentType: paymentType.value,
       total,
       status: 'posted',
       createdBy: session.userId,
       createdAt: Date.now(),
+      invoice_no: invoiceNo,
     })
 
     // 2. خصم المخزون FEFO فعليًا
