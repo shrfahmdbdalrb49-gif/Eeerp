@@ -24,4 +24,16 @@ try {
   if (saved === 'local' || saved === 'server') STORAGE_MODE = saved
 } catch {}
 
+/* إصلاح «محتوى مختلط» (Mixed Content): عند نشر النظام على GitHub Pages (https) فإن محاولة
+   الاتصال بخادم على localhost (http) تُرفض من المتصفح فورًا بخطأ «Failed to fetch».
+   في هذه الحالة لا معنى لوضع الخادم، فنتحول تلقائيًا إلى التخزين المحلي. */
+try {
+  const securePage = location.protocol === 'https:'
+  const triesLocalhost = (import.meta.env.VITE_API_BASE || 'localhost:4000').includes('localhost')
+  if (securePage && triesLocalhost && STORAGE_MODE === 'server') {
+    STORAGE_MODE = 'local'
+    try { localStorage.setItem('sharaf-storage-mode', 'local') } catch {}
+  }
+} catch {}
+
 export { STORAGE_MODE }

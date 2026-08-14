@@ -4,7 +4,7 @@
    ============================================ */
 import { db, audit, hashPassword } from './database.js'
 import { serverLogin, serverLogout, serverSession, getToken } from './api.js'
-import { getStorageMode } from './storage.js'
+import { getStorageMode, setStorageMode } from './storage.js'
 
 const SESSION_KEY = 'sharaf-erp-session'
 
@@ -31,6 +31,16 @@ export async function login(username, password) {
       const r = await serverLogin(username, password)
       return { ok: true, user: r.user }
     } catch (e) {
+      // فشل اتصال بالخادم (مثال: «محتوى مختلط» عند نشر GitHub Pages وعنوان الخادم localhost):
+      // نتحول تلقائيًا إلى التخزين المحلي ونكرر محاولة تسجيل الدخول محليًا
+      const netErr = !e.status && /fetch|network|mixed content/i.test(e.message || '')
+      if (netErr) {
+        console.warn('[SharafERP] الخادم غير متاح (' + e.message + ') — تشغيل وضع الاستعراض التلقائي')
+        setStorageMode('local')
+        const { initSystem } = await import('./database.js')
+        await initSystem()
+        return login(username, password)
+      }
       return { ok: false, error: e.message || 'خطأ في المصادقة' }
     }
   }
