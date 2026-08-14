@@ -14,12 +14,13 @@
     <div class="ribbon-center">
       <label class="quick-search" :title="'بحث سريع (Ctrl+F)'">
         <span class="qs-icon">🔍</span>
-        <input
-          ref="searchInput"
-          class="qs-input"
-          type="text"
-          v-model="searchText"
-          placeholder="بحث سريع... (Ctrl+F)"
+          <input
+            ref="searchInput"
+            class="qs-input"
+            type="text"
+            dir="ltr"
+            v-model="searchText"
+            placeholder="بحث سريع... (Ctrl+F)"
           @keydown="handleSearchKey"
         />
       </label>

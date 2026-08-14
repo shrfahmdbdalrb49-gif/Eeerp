@@ -123,6 +123,7 @@
     <Taskbar
       :windows="openWindows"
       :active-window="activeWindowId"
+      :user-name="currentUser?.fullName || 'مدير النظام'"
       @window-activate="activeWindowId = $event"
     />
     </template>
