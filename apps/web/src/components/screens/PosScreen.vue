@@ -151,6 +151,17 @@ async function checkout() {
     }
     const paid = paymentType.value === 'credit' ? 0 : total
     const saleDate = new Date().toISOString().slice(0, 10)
+    /* حد ائتماني للعميل عند البيع الآجل */
+    if (paymentType.value === 'credit' && customerId.value) {
+      const customer = await db.customers.get(customerId.value)
+      if (customer && (customer.creditLimit || 0) > 0) {
+        const pending = await db.salesInvoices.where('customerId').equals(customerId.value).and(i => i.status !== 'cancelled').toArray()
+        const owed = pending.reduce((s, i) => s + ((i.total || 0) - (i.paid || 0)), 0)
+        if (owed + total > customer.creditLimit) {
+          throw new Error(`تجاوز الحد الائتماني للعميل "${customer.name}" — المتبقي عليه ${fmt(owed)} + الفاتورة الجديدة ${fmt(total)} > الحد ${fmt(customer.creditLimit)}`)
+        }
+      }
+    }
     /* ترقيم آمن لا يتكرر حتى تحت الضغط المتزامن */
     const { nextDocNo } = await import('../../db/sequences.js')
     const invoiceNo = await nextDocNo('sale', new Date(saleDate).getFullYear())
