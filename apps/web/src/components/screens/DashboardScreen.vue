@@ -77,7 +77,7 @@ async function loadKpi() {
 
   // قيمة المخزون = مجموع qty×cost لكل التشغيلات
   const batches = await db.batches.toArray()
-  const inventoryValue = batches.filter(b => !b.quarantined && b.qty > 0).reduce((s, b) => s + b.qty * (b.cost || 0), 0)
+  const inventoryValue = batches.filter(b => !b.quarantined && b.qty > 0).reduce((s, b) => s + b.qty * (b.cost ?? b.costPrice ?? 0), 0)
 
   // أصناف قريبة الانتهاء (خلال 90 يومًا)
   const soon = new Date(); soon.setDate(soon.getDate() + 90)

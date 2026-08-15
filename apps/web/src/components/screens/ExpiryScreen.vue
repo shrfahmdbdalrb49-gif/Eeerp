@@ -132,7 +132,7 @@ async function loadData() {
       }
       return {
         batchId: b.id, itemId: b.itemId, batchNo: b.batchNo || `LOT-${b.id}`,
-        expDate: b.expDate, qty: b.qty, cost: b.cost || 0, quarantined,
+        expDate: b.expDate, qty: b.qty, cost: b.cost ?? b.costPrice ?? 0, quarantined,
         itemName: item.name, itemCode: item.code,
       }
     })

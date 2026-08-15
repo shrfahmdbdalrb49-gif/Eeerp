@@ -209,7 +209,7 @@ async function loadData() {
     if (!b.quarantined && b.qty > 0) {
       const x = g[b.itemId] || { total: 0, cost: 0 }
       x.total += b.qty
-      x.cost += b.qty * (b.cost || 0)
+      x.cost += b.qty * (b.cost ?? b.costPrice ?? 0)
       if (!x.nextExpiry || (b.expDate && b.expDate < x.nextExpiry)) x.nextExpiry = b.expDate
       g[b.itemId] = x
     }
