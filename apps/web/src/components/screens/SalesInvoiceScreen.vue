@@ -85,43 +85,32 @@
     <template v-else>
       <div class="ox-layout">
 
-        <!-- 1. شريط العمليات العلوي المضغوط -->
-        <div class="topbar">
-          <div class="topbar-right">
-            <h1 class="topbar-title">فاتورة مبيعات</h1>
-            <span class="topbar-status status-name" :class="editStatusClass">{{ editStatusName }}</span>
-            <span class="topbar-status" v-if="form.docNo">· {{ form.docNo }}</span>
-          </div>
-          <div class="topbar-center">
-            <button class="tb-btn" @click="goList" title="السجل">سجل</button>
-            <button class="tb-btn" @click="saveDraft" :disabled="saving">F9 حفظ</button>
-            <button class="tb-btn" @click="save" :disabled="saving">حفظ وترحيل</button>
-            <button class="tb-btn" @click="saveThenPrint" :disabled="saving">🖨 طباعة</button>
-            <button class="tb-btn warn" @click="holdInvoice" :disabled="saving" title="تعليق (F4)">⏸ تعليق</button>
-            <button class="tb-btn danger" @click="closeForm">إلغاء</button>
-          </div>
-          <div class="topbar-left">
-            <button class="tb-btn ghost" @click="prevInvoice" title="F2">◀</button>
-            <button class="tb-btn ghost" @click="nextInvoice" title="F12">▶</button>
-          </div>
+        <!-- 1. شريط عنوان الفاتورة المضغوط -->
+        <div class="ox-titlebar">
+          <span class="ox-title">فاتورة مبيعات</span>
+          <span class="topbar-status status-name" :class="editStatusClass">{{ editStatusName }}</span>
+          <span class="ox-title-sep" v-if="form.docNo">· {{ form.docNo }}</span>
         </div>
 
-        <!-- 2. صفوف الحقول المضغوطة: صف المستند ثم صف العميل والدفع -->
+        <!-- 2. صف الحقول الأول: رقم الفاتورة | التاريخ | الوقت | الفرع | المخزن | المستخدم -->
         <div class="ox-head">
-          <div class="ox-row">
-            <div class="ox-field"><label>رقم الفاتورة</label><input class="ox-inp" :value="docNoDisplay" readonly tabindex="-1"/></div>
-            <div class="ox-field"><label>النوع</label>
-              <select class="ox-inp" v-model="form.docType"><option value="sale">بيع</option><option value="wholesale">بيع جملة</option><option value="insurance">تأمين</option></select>
+          <div class="ox-field"><label>رقم الفاتورة</label><input class="ox-inp" :value="docNoDisplay" readonly tabindex="-1"/></div>
+          <div class="ox-field"><label>التاريخ</label>
+            <div class="ox-date-row">
+              <input type="date" class="ox-inp ox-date-hidden" v-model="form.date" :style="{ position:'absolute', opacity:0, width:'100%', height:'30px' }" aria-label="تاريخ الفاتورة" />
+              <input class="ox-inp" :value="dateLabel" readonly tabindex="-1" />
             </div>
-            <div class="ox-field"><label>التاريخ</label><input type="date" class="ox-inp" v-model="form.date" /></div>
-            <div class="ox-field"><label>الوقت</label><input class="ox-inp" :value="currentTime" readonly tabindex="-1"/></div>
-            <div class="ox-field"><label>الفرع</label><select class="ox-inp" v-model.number="form.storeId"><option :value="1">الفرع الرئيسي</option></select></div>
-            <div class="ox-field"><label>المخزن</label><select class="ox-inp" v-model.number="form.warehouseId"><option :value="1">المخزن الرئيسي</option></select></div>
-            <div class="ox-field"><label>المستخدم</label><input class="ox-inp" :value="currentUserName" readonly tabindex="-1"/></div>
           </div>
-          <div class="ox-row">
-            <div class="ox-field ox-customer" :class="{ 'ox-field-focus': customerDropdownOpen }">
-              <label>العميل (اسم/كود/هاتف — ↓ للتنقل، Enter للاختيار، + لجديد)</label>
+          <div class="ox-field"><label>الوقت</label><input class="ox-inp" :value="currentTime" readonly tabindex="-1"/></div>
+          <div class="ox-field"><label>الفرع</label><select class="ox-inp" v-model.number="form.storeId"><option :value="1">الفرع الرئيسي</option></select></div>
+          <div class="ox-field"><label>المخزن</label><select class="ox-inp" v-model.number="form.warehouseId"><option :value="1">المخزن الرئيسي</option></select></div>
+          <div class="ox-field"><label>المستخدم</label><input class="ox-inp" :value="currentUserName" readonly tabindex="-1"/></div>
+        </div>
+
+        <!-- 3. صف الحقول الثاني: العميل | نوع البيع | طريقة الدفع | العملة -->
+        <div class="ox-head2">
+          <div class="ox-field ox-customer" :class="{ 'ox-field-focus': customerDropdownOpen }">
+              <label>العميل</label>
               <div class="ox-cust-row">
                 <input class="ox-inp ox-cust-inp" v-model="customerSearch" placeholder="بحث عن العميل..."
                        ref="customerInput" list="cust-list"
@@ -158,14 +147,13 @@
               <label>سابقة / حد ائتمان / بعد الفاتورة</label>
               <span class="ox-mini-info">{{ fmt(customerPrevBalance) }} / {{ fmt(selectedCustomer.creditLimit || 0) }} / <b>{{ fmt(customerBalanceAfter) }}</b></span>
             </div>
-          </div>
         </div>
 
-        <!-- 3. شريط إدخال الصنف: حقل كبير + نتائج فورية تحت الحقل -->
+        <!-- 4. شريط إدخال الصنف: حقل كبير واحد + الكمية بجانبه + نتائج فورية تحت الحقل -->
         <div class="ox-itembar">
           <div class="ox-search-cell" :class="{ 'ox-field-focus': dropdownOpen }">
             <span class="tb-search-icon">🔍</span>
-            <input class="ox-search-input" v-model="quickItem" placeholder="اكتب أول حرف من اسم الصنف أو امسح الباركود (Ctrl+F للتركيز)..."
+            <input class="ox-search-input" v-model="quickItem" placeholder="اكتب أول حرف من اسم الصنف أو امسح الباركود... (Enter للإضافة)"
                    list="quick-items" ref="quickInput"
                    @input="onQuickSearch" @focus="openItemDropdown"
                    @keydown.enter.prevent="quickItemSubmit"
@@ -186,7 +174,7 @@
             </div>
           </div>
           <input type="number" min="1" step="1" class="ox-qty" v-model.number="quickQty" ref="qtyInput" placeholder="الكمية" />
-          <button class="tb-btn primary ox-add-btn" @click="quickItemSubmit" :disabled="!quickItem.trim()">إضافة Enter</button>
+          <button class="tb-btn primary ox-add-btn" @click="quickItemSubmit" :disabled="!quickItem.trim()">إضافة</button>
         </div>
 
         <!-- 4. جدول البنود — قلب الشاشة، تحرير مباشر -->
@@ -237,8 +225,8 @@
           </table>
         </div>
 
-        <!-- 5. تبويبات متقدمة (خارج مسار البيع السريع) -->
-        <div class="ox-tabs" v-if="form.docNo || form.lines.length">
+        <!-- 6. تبويبات متقدمة (خارج مسار البيع السريع) -->
+          <div class="ox-tabs ox-tabs-marg" v-if="form.docNo || form.lines.length">
           <button class="tab-btn" :class="{ active: tab === 'cust' }" @click="tab = 'cust'">بيانات العميل</button>
           <button class="tab-btn" :class="{ active: tab === 'ins' }" @click="tab = 'ins'">التأمين</button>
           <button class="tab-btn" :class="{ active: tab === 'journal' }" @click="tab = 'journal'">القيد المحاسبي</button>
@@ -335,26 +323,31 @@
           </div>
         </div>
 
-        <!-- 6. الجزء السفلي: الإجماليات + شريط العمليات -->
-        <div class="ox-footer">
-          <div class="ox-totals">
-            <div class="tr"><span>الإجمالي قبل الخصم</span><span class="tn">{{ fmt(preDiscountTotal) }}</span></div>
-            <div class="tr"><span>الخصم</span><span class="tn">−{{ fmt(totalDiscount) }}</span></div>
-            <div class="tr"><span>الضريبة</span><span class="tn">+{{ fmt(totalTax) }}</span></div>
-            <div class="tr net"><span>صافي الفاتورة</span><span class="tn net-num">{{ fmt(netTotal) }}</span></div>
-            <div class="tr"><span>المدفوع</span><span class="tn">{{ fmt(paidAmount) }}</span></div>
-            <div class="tr"><span>المتبقي</span><span class="tn">{{ fmt(remaining) }}</span></div>
-            <div class="tr"><span>حالة السداد</span><span class="tn" :class="payStatusClass">{{ payStatusName }}</span></div>
-          </div>
-          <div class="ox-ops">
-            <button class="bb-btn primary" @click="openPayWindow" :disabled="saving" title="F10">الدفع</button>
-            <button class="bb-btn" @click="saveDraft" :disabled="saving" title="F9">حفظ</button>
-            <button class="bb-btn primary" @click="save" :disabled="saving">حفظ وترحيل</button>
-            <button class="bb-btn" @click="holdInvoice" :disabled="saving" title="F4">تعليق</button>
-            <button class="bb-btn" @click="saveThenPrint" :disabled="saving">طباعة</button>
-            <button class="bb-btn warn" @click="openDiscountByAmount" title="F5">خصم مبلغ</button>
-            <button class="bb-btn warn" @click="openDiscountByPercent" title="F6">خصم %</button>
-            <button class="bb-btn" @click="openMultiPay" title="F12">تعدد الدفع</button>
+        <!-- 7. صف الإجماليات الأفقي + شريط الأوامر السفلي -->
+        <div class="ox-summary">
+          <div class="ox-sum-item"><span class="ox-sum-lbl">الإجمالي</span><span class="ox-sum-val">{{ fmt(preDiscountTotal) }}</span></div>
+          <div class="ox-sum-item"><span class="ox-sum-lbl">الخصم</span><span class="ox-sum-val">−{{ fmt(totalDiscount) }}</span></div>
+          <div class="ox-sum-item"><span class="ox-sum-lbl">الضريبة</span><span class="ox-sum-val">+{{ fmt(totalTax) }}</span></div>
+          <div class="ox-sum-item ox-sum-net"><span class="ox-sum-lbl">الصافي</span><span class="ox-sum-val">{{ fmt(netTotal) }}</span></div>
+          <div class="ox-sum-item"><span class="ox-sum-lbl">المدفوع</span><span class="ox-sum-val">{{ fmt(paidAmount) }}</span></div>
+          <div class="ox-sum-item"><span class="ox-sum-lbl">المتبقي</span><span class="ox-sum-val">{{ fmt(remaining) }}</span></div>
+          <div class="ox-sum-item"><span class="ox-sum-lbl">حالة السداد</span><span class="ox-sum-val" :class="payStatusClass">{{ payStatusName }}</span></div>
+        </div>
+
+        <!-- 8. شريط الأوامر السفلي الواحد -->
+        <div class="ox-cmdbar">
+          <button class="cm-btn" @click="openNewInvoice" title="F11">➕ جديد</button>
+          <button class="cm-btn" @click="goList" title="السجل">📋 سجل</button>
+          <button class="cm-btn" @click="saveDraft" :disabled="saving" title="F9">💾 حفظ</button>
+          <button class="cm-btn primary" @click="save" :disabled="saving" title="F8">✔ ترحيل</button>
+          <button class="cm-btn" @click="saveThenPrint" :disabled="saving">🖨 طباعة</button>
+          <button class="cm-btn warn" @click="holdInvoice" :disabled="saving" title="F4">⏸ تعليق</button>
+          <button class="cm-btn warn" @click="openDiscountByAmount" title="F5">خصم مبلغ</button>
+          <button class="cm-btn warn" @click="openDiscountByPercent" title="F6">خصم %</button>
+          <button class="cm-btn" @click="openMultiPay" title="F12">تعدد الدفع</button>
+          <button class="cm-btn danger" @click="closeWindow">✕ إلغاء</button>
+          <div class="cm-pay">
+            <button class="cm-btn cm-pay-btn" @click="openPayWindow" :disabled="saving" title="F10">💳 دفع (F10)</button>
           </div>
         </div>
       </div>
@@ -665,14 +658,19 @@ const editStatusName = computed(() => {
 const editStatusClass = computed(() => {
   if (form.value.docNo) {
     const inv = invoices.value.find(i => i.invoice_no === form.value.docNo)
-    return inv?.status || 'draft'
+    return statusName(inv?.status || 'draft')
   }
-  return 'draft'
+  return 'مسودة'
 })
 const currentTime = computed(() => {
   const now = new Date()
   return [now.getHours(), now.getMinutes(), now.getSeconds()]
     .map(n => String(n).padStart(2, '0')).join(':')
+})
+const dateLabel = computed(() => {
+  try {
+    return new Intl.DateTimeFormat('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(form.value.date + 'T00:00:00'))
+  } catch (e) { return form.value.date }
 })
 
 /* ---------- الصلاحيات ---------- */
@@ -1428,6 +1426,7 @@ function showInvoiceList() {
   searchText.value = ''
   listFilter.value = ''
 }
+function goList() { showInvoiceList() }
 function selectFromList(inv) {
   openInvoiceForEdit(inv)
 }
@@ -1485,20 +1484,40 @@ onUnmounted(() => {
 .page-screen { width: 100%; }
 .ox-screen { display: flex; flex-direction: column; gap: 6px; min-height: 100%; }
 
-/* ---------- الشريط العلوي ---------- */
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  background: #1e2330; color: #e9ecf3; padding: 6px 14px; border-radius: 8px;
-  min-height: 44px; box-shadow: 0 1px 3px rgba(10, 20, 40, .25);
+/* ---------- تخطيط الشاشة الكلي ---------- */
+.ox-layout {
+  display: flex; flex-direction: column; gap: 6px;
+  width: 100%; height: 100%; min-height: 0; flex: 1;
 }
-.topbar-title { font-weight: 700; font-size: 14.5px; letter-spacing: .2px; }
-.topbar-center { display: flex; align-items: center; gap: 16px; font-size: 12px; }
-.topbar-center .doc-number { font-family: Consolas, monospace; font-weight: 700; color: #ffd966; font-size: 13px; }
-.topbar-right { display: flex; align-items: center; gap: 8px; }
-.topbar-left { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #b8c1d4; }
+
+/* ---------- شريط عنوان الفاتورة ---------- */
+.ox-titlebar {
+  display: flex; align-items: center; gap: 10px;
+  background: #1e2330; color: #e9ecf3; padding: 5px 12px; border-radius: 6px;
+  min-height: 34px; box-shadow: 0 1px 3px rgba(10, 20, 40, .25);
+}
+.ox-title { font-weight: 700; font-size: 13.5px; }
+.ox-title-sep { font-size: 12px; color: #b8c1d4; font-family: Consolas, monospace; }
 .topbar-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #6b7280; }
 .status-name { font-size: 11.5px; }
+.pay-ok { color: #7fd4a5; font-weight: 700; }
+.pay-credit { color: #ffb3a7; font-weight: 700; }
+.pay-partial { color: #ffd966; font-weight: 700; }
+
+/* ---------- صف الحقول الأول: 6 أعمدة ---------- */
+.ox-head {
+  display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 8px;
+  background: #f5f7fa; border: 1px solid #dfe4ec; border-radius: 6px; padding: 6px 10px;
+  align-items: stretch;
+}
+
+/* ---------- صف الحقول الثاني: العميل ممتد + 3 حقول ---------- */
+.ox-head2 {
+  display: grid; grid-template-columns: minmax(260px, 2.2fr) 1fr 1fr 96px; column-gap: 8px;
+  background: #f5f7fa; border: 1px solid #dfe4ec; border-radius: 6px; padding: 6px 10px;
+  align-items: stretch;
+}
 
 /* ---------- أزرار الشريط ---------- */
 .tb-btn {
@@ -1529,17 +1548,28 @@ onUnmounted(() => {
 }
 .ox-inp:focus { border-color: #1f6feb; box-shadow: 0 0 0 2px rgba(31,111,235,.15); }
 .ox-inp-strong { font-weight: 700; background: #eef3ff; font-size: 13.5px; }
-.ox-field { display: flex; flex-direction: column; gap: 2px; }
-.ox-field .ox-inp { min-height: 30px; }
+.ox-field { display: flex; flex-direction: column; gap: 2px; justify-content: center; }
+.ox-field label { font-size: 10.5px; font-weight: 700; color: #5a6472; white-space: nowrap; }
+.ox-field .ox-inp { min-height: 26px; }
 .ox-field-focus { position: relative; }
 .ox-field-focus .ox-inp { border-color: #1f6feb; }
+.ox-date-row { position: relative; display: flex; align-items: center; }
+.ox-date-row .ox-inp[readonly] { text-align: center; }
 
-/* ---------- شريط البحث الفوري ---------- */
-.ox-search-cell { display: flex; gap: 6px; align-items: center; width: 100%; }
-.ox-search-input {
-  flex: 1; border: 1px solid #1f6feb; border-radius: 6px; padding: 6px 10px;
-  font-size: 13.5px; font-weight: 700; outline: none; background: #fff;
+/* ---------- شريط إدخال الصنف ---------- */
+.ox-itembar {
+  display: flex; gap: 8px; align-items: stretch;
+  background: #f5f7fa; border: 1px solid #dfe4ec; border-radius: 6px; padding: 6px 10px;
 }
+.ox-search-cell { display: flex; gap: 6px; align-items: center; width: 100%; position: relative; flex: 1; }
+.ox-search-input {
+  flex: 1; border: 1px solid #1f6feb; border-radius: 6px; padding: 7px 12px;
+  font-size: 13.5px; font-weight: 700; outline: none; background: #fff; min-height: 32px;
+}
+.ox-search-input:focus { box-shadow: 0 0 0 2px rgba(31,111,235,.18); }
+.ox-qty { width: 84px; border: 1px solid #c7ced9; border-radius: 6px; padding: 0 8px; font-size: 13px; outline: none; min-height: 32px; text-align: center; }
+.ox-qty:focus { border-color: #1f6feb; box-shadow: 0 0 0 2px rgba(31,111,235,.15); }
+.ox-add-btn { white-space: nowrap; min-height: 32px; }
 .tb-search-icon { color: #6b7280; }
 
 /* ---------- القائمة الفورية ---------- */
@@ -1559,14 +1589,18 @@ onUnmounted(() => {
 .dd-meta { color: #6b7280; font-size: 11px; }
 .dd-nor { color: #6b7280; font-size: 11px; }
 
-/* ---------- جدول البنود ---------- */
-.ox-lines { border: 1px solid #dfe4ec; border-radius: 8px; overflow: hidden; background: #fff; }
+/* ---------- جدول البنود (المساحة الأكبر) ---------- */
+.ox-lines {
+  flex: 1; min-height: 120px; overflow: auto;
+  border: 1px solid #dfe4ec; border-radius: 6px; background: #fff;
+}
 .ox-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ox-table { height: 100%; }
 .ox-table th {
   background: #262c3a; color: #e9ecf3; font-size: 11.5px; font-weight: 600;
-  padding: 6px 8px; text-align: right; border-left: 1px solid rgba(255,255,255,.08);
+  padding: 5px 8px; text-align: right; border-left: 1px solid rgba(255,255,255,.08); position: sticky; top: 0; z-index: 2;
 }
-.ox-table td { border-bottom: 1px solid #eef1f5; padding: 4px 8px; font-size: 12.5px; }
+.ox-table td { border-bottom: 1px solid #eef1f5; padding: 3px 8px; font-size: 12.5px; }
 .ox-row { background: #fff; }
 .ox-row-active { background: #eef3ff !important; }
 .row-warn { background: #fff7e6 !important; }
@@ -1595,13 +1629,21 @@ onUnmounted(() => {
   font-size: 13px; font-weight: 700; cursor: pointer;
 }
 
-/* ---------- الإجماليات ---------- */
-.ox-totals {
-  display: flex; gap: 12px; align-items: flex-start; justify-content: space-between;
-  background: #1e2330; color: #e9ecf3; border-radius: 8px; padding: 10px 16px;
+/* ---------- صف الإجماليات الأفقي ---------- */
+.ox-summary {
+  display: flex; gap: 6px; align-items: stretch;
+  background: #1e2330; color: #e9ecf3; border-radius: 6px; padding: 6px 12px;
+  flex-wrap: nowrap;
 }
-.tn { font-size: 12.5px; }
-.tn.net { font-size: 18px; font-weight: 800; color: #ffd966; font-family: Consolas, monospace; }
+.ox-sum-item {
+  display: flex; flex-direction: column; gap: 1px; padding: 3px 14px;
+  border-left: 1px solid rgba(255,255,255,.14); flex: 1; align-items: center; justify-content: center;
+}
+.ox-sum-item:last-child { border-left: 0; }
+.ox-sum-lbl { font-size: 10px; color: #b8c1d4; font-weight: 600; }
+.ox-sum-val { font-size: 13px; font-weight: 700; font-family: Consolas, monospace; color: #fff; }
+.ox-sum-net { background: rgba(255,255,255,.07); border-radius: 6px; border-left: 0; }
+.ox-sum-net .ox-sum-val { font-size: 16px; color: #ffd966; }
 .tn-row { display: flex; align-items: center; gap: 6px; }
 .multi-total { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; font-size: 12px; }
 .multi-row { display: flex; gap: 14px; }
@@ -1610,7 +1652,8 @@ onUnmounted(() => {
 .hint-text { color: #9aa3b2; font-size: 11px; }
 
 /* ---------- التبويبات ---------- */
-.ox-tabs { display: flex; gap: 4px; border-bottom: 2px solid #dfe4ec; margin-bottom: 4px; }
+.ox-tabs { display: flex; gap: 4px; border-bottom: 2px solid #dfe4ec; }
+.ox-tabs-marg { margin-top: 2px; }
 .tab-btn {
   background: none; border: 0; padding: 6px 12px; font-size: 12px; cursor: pointer;
   color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -2px; font-weight: 600;
@@ -1618,9 +1661,25 @@ onUnmounted(() => {
 .tab-btn.active { color: #1f6feb; border-bottom-color: #1f6feb; }
 .ox-tabpane { padding: 6px 2px; font-size: 12.5px; }
 
-/* ---------- الفوتر ---------- */
-.ox-footer { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-.ox-ops { display: flex; gap: 6px; align-items: center; }
+/* ---------- شريط الأوامر السفلي ---------- */
+.ox-cmdbar {
+  display: flex; gap: 6px; align-items: center; justify-content: space-between;
+  background: #262c3a; border-radius: 6px; padding: 6px 10px; min-height: 44px;
+}
+.cm-btn {
+  border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #e9ecf3;
+  border-radius: 6px; padding: 6px 14px; font-size: 12.5px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-weight: 600;
+}
+.cm-btn:hover { background: rgba(255,255,255,.16); }
+.cm-btn:disabled { opacity: .5; cursor: not-allowed; }
+.cm-btn.primary { background: #0a7d3a; border-color: #0a7d3a; font-weight: 700; }
+.cm-btn.primary:hover { background: #096a31; }
+.cm-btn.warn { background: #d97706; border-color: #d97706; }
+.cm-btn.danger { background: #b3261e; border-color: #b3261e; margin-right: auto; }
+.cm-pay { display: flex; gap: 6px; align-items: center; }
+.cm-pay-btn { background: #1f6feb; border-color: #1f6feb; font-weight: 800; font-size: 13px; padding: 7px 18px; }
+.cm-pay-btn:hover { background: #1656b8; }
 .ox-mini-info { color: #6b7280; font-size: 11.5px; }
 
 /* ---------- أزرار عامة ---------- */
@@ -1695,8 +1754,12 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .ox-head { grid-template-columns: 1fr 1fr; }
-  .ox-head .inv-meta { grid-column: 1 / -1; }
-  .topbar { flex-wrap: wrap; gap: 6px; }
+  .ox-head2 { grid-template-columns: 1fr 1fr; }
+  .ox-cmdbar { flex-wrap: wrap; }
+  .cm-btn { flex: 1 1 40%; justify-content: center; }
+  .cm-pay-btn { flex: 1 1 100%; }
+  .ox-summary { flex-wrap: wrap; }
+  .ox-sum-item { flex: 1 1 30%; border-left: 0; }
   .mini-grid { grid-template-columns: 1fr; }
 }
 </style>
