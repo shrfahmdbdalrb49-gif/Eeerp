@@ -8,7 +8,7 @@
         @click="$emit('toggle')"
         :title="collapsed ? 'توسيع القائمة' : 'طي القائمة'"
       >
-        <ChevronsIcon :name="collapsed ? 'chevron-right' : 'chevron-left'" />
+        <component :is="ChevronsIcon(collapsed ? 'chevron-right' : 'chevron-left')" :chevron="collapsed ? 'chevron-right' : 'chevron-left'" />
       </button>
     </div>
 
@@ -27,7 +27,7 @@
           </span>
           <span class="section-label">{{ section.title }}</span>
           <span class="section-arrow" :class="{ expanded: openSection === section.key }">
-            <ChevronsIcon :name="openSection === section.key ? 'chevron-down' : 'chevron-left'" />
+            <component :is="ChevronsIcon(openSection === section.key ? 'chevron-down' : 'chevron-left')" :chevron="openSection === section.key ? 'chevron-down' : 'chevron-left'" />
           </span>
         </button>
 
@@ -41,7 +41,7 @@
                 <li v-if="child.children" class="tree-subgroup" :class="{ expanded: expandedSub[child.title] }">
                   <button class="tree-subgroup-title" @click="toggleSub(child.title)" type="button">
                     <span class="tree-chevron" :class="{ rotated: expandedSub[child.title] }">
-                      <ChevronsIcon name="chevron-left" />
+                      <component :is="ChevronsIcon('chevron-left')" chevron="chevron-left" />
                     </span>
                     <span class="tree-label">{{ child.title }}</span>
                   </button>
@@ -104,6 +104,7 @@ import {
   ChartColumn,
   FileText,
   Settings,
+  Users,
   CircleQuestionMark,
 } from 'lucide-vue-next'
 
@@ -144,6 +145,7 @@ const iconMap = {
   ChartColumn,
   FileText,
   Settings,
+  Users,
   CircleQuestionMark,
 }
 
@@ -155,9 +157,10 @@ const iconMap = {
 const Icon = (name) =>
   defineComponent({
     name: `Lc-${name}`,
-    setup(props, { attrs, slots }) {
-      const fn = iconMap[name]
-      return () => h(fn, { ...attrs, ...props }, slots)
+    inheritAttrs: false,
+    render() {
+      // استدعاء render function الأيقونة الخام (props, ctx) → تعيد VNode
+      return iconMap[name](this.$attrs, { slots: this.$slots })
     },
   })
 
@@ -174,9 +177,10 @@ const chevronMap = {
 const ChevronsIcon = (name) =>
   defineComponent({
     name: `Lc-${name}`,
-    setup(props, { attrs, slots }) {
-      const fn = chevronMap[name]
-      return () => h(fn, { ...attrs, ...props }, slots)
+    inheritAttrs: false,
+    props: { chevron: String },
+    render() {
+      return chevronMap[this.chevron](this.$attrs, { slots: this.$slots })
     },
   })
 
@@ -190,7 +194,7 @@ const allSections = [
     key: 'sec-dashboard',
     menuKey: 'dashboard',
     title: 'النظام',
-    icon: Icon({ name: 'LayoutGrid' }),
+    icon: Icon('LayoutGrid'),
     iconColor: '#60a5fa',
     defaultPage: 'dashboard',
     groups: [
@@ -208,7 +212,7 @@ const allSections = [
     key: 'sec-masterdata',
     menuKey: 'masterdata',
     title: 'البيانات الأساسية',
-    icon: Icon({ name: 'Database' }),
+    icon: Icon('Database'),
     iconColor: '#34d399',
     defaultPage: 'items',
     groups: [
@@ -245,7 +249,7 @@ const allSections = [
     key: 'sec-sales',
     menuKey: 'sales',
     title: 'المبيعات',
-    icon: Icon({ name: 'ShoppingCart' }),
+    icon: Icon('ShoppingCart'),
     iconColor: '#f472b6',
     defaultPage: 'pos',
     groups: [
@@ -272,7 +276,7 @@ const allSections = [
     key: 'sec-purchases',
     menuKey: 'purchases',
     title: 'المشتريات',
-    icon: Icon({ name: 'PackageSearch' }),
+    icon: Icon('PackageSearch'),
     iconColor: '#fb923c',
     defaultPage: 'purchase-invoices',
     groups: [
@@ -296,7 +300,7 @@ const allSections = [
     key: 'sec-inventory',
     menuKey: 'inventory',
     title: 'المخزون',
-    icon: Icon({ name: 'Boxes' }),
+    icon: Icon('Boxes'),
     iconColor: '#a78bfa',
     defaultPage: 'items',
     groups: [
@@ -321,7 +325,7 @@ const allSections = [
     key: 'sec-insurance',
     menuKey: 'insurance',
     title: 'التأمين الصحي',
-    icon: Icon({ name: 'ShieldCheck' }),
+    icon: Icon('ShieldCheck'),
     iconColor: '#2dd4bf',
     defaultPage: 'insurance-claims',
     groups: [
@@ -342,7 +346,7 @@ const allSections = [
     key: 'sec-treasury',
     menuKey: 'treasury',
     title: 'الصندوق والبنوك',
-    icon: Icon({ name: 'Landmark' }),
+    icon: Icon('Landmark'),
     iconColor: '#fbbf24',
     defaultPage: 'receipt-voucher',
     groups: [
@@ -368,7 +372,7 @@ const allSections = [
     key: 'sec-accounting',
     menuKey: 'accounting',
     title: 'الحسابات',
-    icon: Icon({ name: 'BookOpen' }),
+    icon: Icon('BookOpen'),
     iconColor: '#60a5fa',
     defaultPage: 'accounts',
     groups: [
@@ -396,7 +400,7 @@ const allSections = [
     key: 'sec-assets',
     menuKey: 'assets',
     title: 'الأصول الثابتة',
-    icon: Icon({ name: 'Building2' }),
+    icon: Icon('Building2'),
     iconColor: '#94a3b8',
     defaultPage: 'fixed-assets',
     groups: [
@@ -415,7 +419,7 @@ const allSections = [
     key: 'sec-profit',
     menuKey: 'profit',
     title: 'الربحية والتكاليف',
-    icon: Icon({ name: 'ChartColumn' }),
+    icon: Icon('ChartColumn'),
     iconColor: '#4ade80',
     defaultPage: 'item-cost',
     groups: [
@@ -436,7 +440,7 @@ const allSections = [
     key: 'sec-hr',
     menuKey: 'hr',
     title: 'الموارد البشرية والرواتب',
-    icon: Icon({ name: 'Users' }),
+    icon: Icon('Users'),
     iconColor: '#818cf8',
     defaultPage: 'employees',
     groups: [
@@ -457,7 +461,7 @@ const allSections = [
     key: 'sec-reports',
     menuKey: 'reports',
     title: 'التقارير',
-    icon: Icon({ name: 'FileText' }),
+    icon: Icon('FileText'),
     iconColor: '#22d3ee',
     defaultPage: 'reports-sales',
     groups: [
@@ -501,7 +505,7 @@ const allSections = [
     key: 'sec-admin',
     menuKey: 'admin',
     title: 'الإدارة',
-    icon: Icon({ name: 'Settings' }),
+    icon: Icon('Settings'),
     iconColor: '#cbd5e1',
     defaultPage: 'users',
     groups: [
@@ -528,7 +532,7 @@ const allSections = [
     key: 'sec-help',
     menuKey: 'help',
     title: 'المساعدة',
-    icon: Icon({ name: 'CircleQuestionMark' }),
+    icon: Icon('CircleQuestionMark'),
     iconColor: '#f87171',
     defaultPage: 'user-guide',
     groups: [
