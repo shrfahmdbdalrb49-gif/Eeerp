@@ -90,7 +90,7 @@
  *   - toggle        → طي/توسيع القائمة
  *   - select(page)  → النقر على بند نهائي في الشجرة
  */
-import { ref } from 'vue'
+import { ref, defineComponent } from 'vue'
 import {
   LayoutGrid,
   Database,
@@ -148,11 +148,18 @@ const iconMap = {
 }
 
 /**
- * أيقونات lucide v1 هي render functions عارية — لا يجب لفّها بـshallowRef/ref
- * وإلا سيحوّلها Vue إلى Reactive Proxy وتُعرض كـ"[object Object]" داخل
- * <component :is="...">. نمرّر الدوال الخام مباشرة.
+ * أيقونات lucide v1 تصدَّر كـ render functions عارية وليست مكونات Vue
+ * (لا تحمل __v_isComponent)، فتفشل في الظهور داخل <component :is="...">.
+ * الحل: لفّها بـdefineComponent لتصبح مكونات حقيقية قابلة للعرض.
  */
-const Icon = (name) => iconMap[name]
+const Icon = (name) =>
+  defineComponent({
+    name: `Lc-${name}`,
+    setup(props, { attrs, slots }) {
+      const fn = iconMap[name]
+      return () => fn(props, { attrs, slots })
+    },
+  })
 
 /**
  * مكوّن أيقونة السهم الداخلي (chevron-left / chevron-right / chevron-down)
@@ -164,7 +171,14 @@ const chevronMap = {
   'chevron-right': ChevronRight,
   'chevron-down': ChevronDown,
 }
-const ChevronsIcon = (name) => chevronMap[name]
+const ChevronsIcon = (name) =>
+  defineComponent({
+    name: `Lc-${name}`,
+    setup(props, { attrs, slots }) {
+      const fn = chevronMap[name]
+      return () => fn(props, { attrs, slots })
+    },
+  })
 
 /**
  * الأقسام الـ14 الرئيسية — جميع وظائف النظام الحالية موزعة عليها.
