@@ -90,7 +90,7 @@
  *   - toggle        → طي/توسيع القائمة
  *   - select(page)  → النقر على بند نهائي في الشجرة
  */
-import { ref, defineComponent } from 'vue'
+import { ref, defineComponent, h } from 'vue'
 import {
   LayoutGrid,
   Database,
@@ -157,7 +157,7 @@ const Icon = (name) =>
     name: `Lc-${name}`,
     setup(props, { attrs, slots }) {
       const fn = iconMap[name]
-      return () => fn(props, { attrs, slots })
+      return () => h(fn, { ...attrs, ...props }, slots)
     },
   })
 
@@ -176,7 +176,7 @@ const ChevronsIcon = (name) =>
     name: `Lc-${name}`,
     setup(props, { attrs, slots }) {
       const fn = chevronMap[name]
-      return () => fn(props, { attrs, slots })
+      return () => h(fn, { ...attrs, ...props }, slots)
     },
   })
 
