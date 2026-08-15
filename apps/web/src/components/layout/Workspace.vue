@@ -43,13 +43,27 @@
             </button>
             <button
               title="إغلاق"
-              @click.stop="$emit('window-close', win.id)"
+              @click.stop="requestClose(win.id)"
             >
               ✕
             </button>
           </div>
         </div>
 
+        <!-- رسالة تأكيد إغلاق النافذة — تظهر على النافذة النشطة فقط -->
+        <div
+          v-if="pendingCloseId === win.id"
+          class="close-confirm-overlay"
+          @mousedown.stop
+        >
+          <div class="close-confirm-box">
+            <p class="close-confirm-text">هل تريد الخروج من هذه النافذة؟</p>
+            <div class="close-confirm-actions">
+              <button class="confirm-yes" @click="confirmClose">نعم، خروج</button>
+              <button class="confirm-no" @click="cancelClose">إلغاء</button>
+            </div>
+          </div>
+        </div>
         <!-- جسم النافذة — slot مسمى حسب نوع النافذة -->
         <div class="window-body">
           <slot :name="win.type" :window="win">
@@ -70,7 +84,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 /**
  * Workspace — مساحة العمل التي تستضيف النوافذ المفتوحة
@@ -97,7 +111,27 @@ const props = defineProps({
   },
 })
 
-defineEmits(['window-activate', 'window-close', 'window-minimize', 'window-maximize'])
+const emit = defineEmits(['window-activate', 'window-close', 'window-minimize', 'window-maximize'])
+
+// معرف النافذة المعلقة إغلاقها (بانتظار تأكيد المستخدم)
+const pendingCloseId = ref(null)
+
+/** طلب إغلاق نافذة: يُظهر رسالة تأكيد بدلًا من الإغلاق الفوري */
+function requestClose(id) {
+  pendingCloseId.value = id
+}
+
+/** تأكيد الإغلاق: تُغلق النافذة فعلًا */
+function confirmClose() {
+  const id = pendingCloseId.value
+  pendingCloseId.value = null
+  if (id != null) emit('window-close', id)
+}
+
+/** إلغاء الإغلاق: تبقى النافذة مفتوحة */
+function cancelClose() {
+  pendingCloseId.value = null
+}
 
 /** ترتيب النوافذ: النافذة النشطة تظهر فوق الجميع */
 const sortedWindows = computed(() => {
@@ -144,6 +178,66 @@ function statusBadgeClass(status) {
 
 .window-frame.active {
   z-index: 10;
+}
+
+/* رسالة تأكيد إغلاق النافذة */
+.close-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 15, 30, 0.45);
+  border-radius: inherit;
+}
+
+.close-confirm-box {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 280px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+
+.close-confirm-text {
+  margin: 0 0 16px;
+  font-size: var(--font-size-md, 15px);
+  font-weight: 600;
+  color: var(--color-text, #111827);
+}
+
+.close-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.close-confirm-actions button {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s ease;
+}
+
+.close-confirm-actions button:hover {
+  opacity: 0.85;
+}
+
+.close-confirm-actions .confirm-yes {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.close-confirm-actions .confirm-no {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
 }
 
 .window-title-text {

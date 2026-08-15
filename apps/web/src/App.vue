@@ -441,6 +441,8 @@ function selectPage(page) {
   if (exists) {
     activeWindowId.value = exists.id
     exists.minimized = false
+    // إعادة القائمة الجانبية مطوية عند الانتقال إلى نافذة مفتوحة مسبقًا
+    sidebarCollapsed.value = true
     return
   }
   const newId = 'win-' + Date.now()
@@ -455,6 +457,8 @@ function selectPage(page) {
   }
   openWindows.value.push(newWin)
   activeWindowId.value = newId
+  // إغلاق القائمة الجانبية تلقائيًا بعد فتح النافذة الجديدة
+  sidebarCollapsed.value = true
 }
 
 // ---- اختصارات لوحة المفاتيح ----
