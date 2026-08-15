@@ -8,7 +8,7 @@
         @click="$emit('toggle')"
         :title="collapsed ? 'توسيع القائمة' : 'طي القائمة'"
       >
-        <component :is="ChevronsIcon(collapsed ? 'chevron-right' : 'chevron-left')" :chevron="collapsed ? 'chevron-right' : 'chevron-left'" />
+        <component :is="ChevronsIcon(collapsed ? 'chevron-right' : 'chevron-left')" :name="collapsed ? 'chevron-right' : 'chevron-left'" />
       </button>
     </div>
 
@@ -27,7 +27,7 @@
           </span>
           <span class="section-label">{{ section.title }}</span>
           <span class="section-arrow" :class="{ expanded: openSection === section.key }">
-            <component :is="ChevronsIcon(openSection === section.key ? 'chevron-down' : 'chevron-left')" :chevron="openSection === section.key ? 'chevron-down' : 'chevron-left'" />
+            <component :is="ChevronsIcon(openSection === section.key ? 'chevron-down' : 'chevron-left')" :name="openSection === section.key ? 'chevron-down' : 'chevron-left'" />
           </span>
         </button>
 
@@ -41,7 +41,7 @@
                 <li v-if="child.children" class="tree-subgroup" :class="{ expanded: expandedSub[child.title] }">
                   <button class="tree-subgroup-title" @click="toggleSub(child.title)" type="button">
                     <span class="tree-chevron" :class="{ rotated: expandedSub[child.title] }">
-                      <component :is="ChevronsIcon('chevron-left')" chevron="chevron-left" />
+                      <component :is="ChevronsIcon('chevron-left')" name="chevron-left" />
                     </span>
                     <span class="tree-label">{{ child.title }}</span>
                   </button>
@@ -168,19 +168,39 @@ const Icon = (name) =>
  * مكوّن أيقونة السهم الداخلي (chevron-left / chevron-right / chevron-down)
  * من مكتبة lucide الفعلية بدل رموز نصية.
  */
-import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-vue-next'
-const chevronMap = {
-  'chevron-left': ChevronLeft,
-  'chevron-right': ChevronRight,
-  'chevron-down': ChevronDown,
+/**
+ * أسهم السهميات من مكتبة lucide الفعلية — نستخدم iconNode الأصلي مباشرة
+ * ونرسمه inline عبر h() بنفس أسلوب createLucideIcon (نفس viewBox وstroke وfill)
+ * بدون تمريره عبر مكوّنات wrapper معطلة.
+ */
+const chevronNodes = {
+  'chevron-left': [['path', { d: 'm15 18-6-6 6-6', key: '1wnfg3' }]],
+  'chevron-right': [['path', { d: 'm9 18 6-6-6-6', key: 'mthhwq' }]],
+  'chevron-down': [['path', { d: 'm6 9 6 6 6-6', key: 'qrunsl' }]],
 }
 const ChevronsIcon = (name) =>
   defineComponent({
     name: `Lc-${name}`,
-    inheritAttrs: false,
-    props: { chevron: String },
+    props: { name: String },
     render() {
-      return chevronMap[this.chevron](this.$attrs, { slots: this.$slots })
+      const node = chevronNodes[this.name]
+      return h(
+        'svg',
+        {
+          xmlns: 'http://www.w3.org/2000/svg',
+          width: 24,
+          height: 24,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': 2,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          class: ['lucide', `lucide-${this.name}`].join(' '),
+          ...this.$attrs,
+        },
+        node.map(([tag, attrs]) => h(tag, attrs))
+      )
     },
   })
 
