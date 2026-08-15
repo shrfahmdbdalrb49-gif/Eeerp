@@ -200,6 +200,20 @@
               <tr v-for="(l, i) in form.lines" :key="i"
                   :class="{ 'ox-row-active': i === activeLine, 'row-warn': lineHasWarning(l) }"
                   @click="activeLine = i">
+                <td class="ox-line-card">
+                  <div class="ox-line-card-top">
+                    <span class="ox-line-item">{{ itemOf(l.itemId)?.name || '—' }} <span class="dd-code" v-if="barcodeOf(l.itemId)">{{ barcodeOf(l.itemId) }}</span></span>
+                    <span class="ox-line-lot">{{ l.lotLabel || '—' }}</span>
+                    <span class="ox-line-exp">{{ expiryOf(l.itemId) || '—' }}</span>
+                    <button class="delete-btn-sm" @click.stop="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف السطر">🗑</button>
+                  </div>
+                  <div class="ox-line-grid">
+                    <div class="ox-line-cell"><label>الوحدة</label><span>{{ unitLabel(l.unit || itemOf(l.itemId)?.unit) || '—' }}</span></div>
+                    <div class="ox-line-cell"><label>الكمية (المتاح {{ itemOf(l.itemId)?._stock ?? '—' }})</label><input type="number" min="1" step="1" class="lx" v-model.number="l.qty" @input="recalc()" /></div>
+                    <div class="ox-line-cell"><label>السعر / الخصم</label><input type="number" min="0" step="0.01" class="lx" v-model.number="l.price" @input="recalc()" :disabled="!canEditPrice" style="width:70px" /> / <input type="number" min="0" step="0.01" class="lx" v-model.number="l.discount" @input="recalc()" :disabled="!canEditDiscount" style="width:56px" /></div>
+                    <div class="ox-line-cell"><label>الإجمالي</label><span class="ox-line-total">{{ fmt(lineTotal(l)) }}</span></div>
+                  </div>
+                </td>
                 <td><span class="cell-item-name">{{ itemOf(l.itemId)?.name || '—' }}</span></td>
                 <td class="num-cell tiny">{{ barcodeOf(l.itemId) || '—' }}</td>
                 <td>{{ unitLabel(l.unit || itemOf(l.itemId)?.unit) }}</td>
@@ -1482,12 +1496,16 @@ onUnmounted(() => {
    شاشة الفاتورة — نمط Onyx Pro (كثافة مكتبية)
    ============================================ */
 .page-screen { width: 100%; }
-.ox-screen { display: flex; flex-direction: column; gap: 6px; min-height: 100%; }
+.ox-screen {
+  display: flex; flex-direction: column; gap: 6px;
+  height: 100%; min-height: 0; overflow: hidden;
+}
 
 /* ---------- تخطيط الشاشة الكلي ---------- */
 .ox-layout {
   display: flex; flex-direction: column; gap: 6px;
-  width: 100%; height: 100%; min-height: 0; flex: 1;
+  width: 100%; flex: 1; min-height: 0;
+  height: 100%;
 }
 
 /* ---------- شريط عنوان الفاتورة ---------- */
@@ -1532,13 +1550,12 @@ onUnmounted(() => {
 .tb-btn.danger { background: #b3261e; border-color: #b3261e; }
 .tb-btn.ghost { border-color: transparent; background: transparent; color: #b8c1d4; }
 
-/* ---------- رأس الحقول المضغوط ---------- */
+/* ---------- رأس الحقول المضغوط ---------- (تعريف واحد صحيح: 6 أعمدة) */
 .ox-head {
-  display: grid; grid-template-columns: 96px 150px 170px 150px; grid-template-rows: auto auto;
-  column-gap: 10px; row-gap: 6px; align-items: center;
-  background: #f5f7fa; border: 1px solid #dfe4ec; border-radius: 8px; padding: 8px 12px;
+  display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 8px;
+  background: #f5f7fa; border: 1px solid #dfe4ec; border-radius: 8px; padding: 6px 10px;
+  align-items: stretch;
 }
-.ox-head .inv-meta { grid-column: 1 / 3; display: flex; flex-direction: column; gap: 2px; }
 .inv-co { display: flex; align-items: center; gap: 6px; }
 .inv-co-name { font-weight: 700; font-size: 14px; }
 .inv-co-sub { font-size: 11px; color: #6b7280; }
@@ -1589,13 +1606,36 @@ onUnmounted(() => {
 .dd-meta { color: #6b7280; font-size: 11px; }
 .dd-nor { color: #6b7280; font-size: 11px; }
 
+/* ---------- بطاقة الصف على الجوال (تُعرض بدل الجدول العريض) ---------- */
+td.ox-line-card { display: none; }
+.ox-line-card {
+  display: none;
+  border-bottom: 1px solid #eef1f5; padding: 7px 10px;
+}
+.ox-line-card:last-child { border-bottom: 0; }
+.ox-line-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ox-line-item { font-weight: 700; font-size: 12.5px; flex: 1; }
+.ox-line-lot { font-size: 10.5px; color: #1f6feb; white-space: nowrap; }
+.ox-line-exp { font-size: 10.5px; color: #6b7280; }
+.ox-line-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin-top: 5px; align-items: center;
+}
+.ox-line-cell { display: flex; flex-direction: column; gap: 2px; }
+.ox-line-cell label { font-size: 9.5px; color: #6b7280; font-weight: 700; }
+.ox-line-total { font-weight: 800; font-size: 13px; color: #0a7d3a; }
+.delete-btn-sm {
+  border: 0; background: none; color: #dc2626; cursor: pointer; font-size: 14px; padding: 2px 6px;
+}
+.delete-btn-sm:disabled { opacity: .3; cursor: default; }
+
 /* ---------- جدول البنود (المساحة الأكبر) ---------- */
 .ox-lines {
   flex: 1; min-height: 120px; overflow: auto;
   border: 1px solid #dfe4ec; border-radius: 6px; background: #fff;
 }
 .ox-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.ox-table { height: 100%; }
+.ox-lines table { height: auto; }
+.ox-table { overflow: hidden; }
 .ox-table th {
   background: #262c3a; color: #e9ecf3; font-size: 11.5px; font-weight: 600;
   padding: 5px 8px; text-align: right; border-left: 1px solid rgba(255,255,255,.08); position: sticky; top: 0; z-index: 2;
@@ -1652,7 +1692,8 @@ onUnmounted(() => {
 .hint-text { color: #9aa3b2; font-size: 11px; }
 
 /* ---------- التبويبات ---------- */
-.ox-tabs { display: flex; gap: 4px; border-bottom: 2px solid #dfe4ec; }
+.ox-tabs { display: flex; gap: 4px; border-bottom: 2px solid #dfe4ec; overflow-x: auto; }
+.ox-tabs::-webkit-scrollbar { height: 0; }
 .ox-tabs-marg { margin-top: 2px; }
 .tab-btn {
   background: none; border: 0; padding: 6px 12px; font-size: 12px; cursor: pointer;
@@ -1665,6 +1706,7 @@ onUnmounted(() => {
 .ox-cmdbar {
   display: flex; gap: 6px; align-items: center; justify-content: space-between;
   background: #262c3a; border-radius: 6px; padding: 6px 10px; min-height: 44px;
+  flex-shrink: 0; margin-top: auto;
 }
 .cm-btn {
   border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08); color: #e9ecf3;
@@ -1754,12 +1796,27 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .ox-head { grid-template-columns: 1fr 1fr; }
-  .ox-head2 { grid-template-columns: 1fr 1fr; }
+  .ox-head2 { grid-template-columns: 1fr; }
   .ox-cmdbar { flex-wrap: wrap; }
-  .cm-btn { flex: 1 1 40%; justify-content: center; }
+  .cm-btn { flex: 1 1 30%; justify-content: center; font-size: 11px; padding: 6px 6px; }
+  .cm-btn.danger { flex: 1 1 46%; }
   .cm-pay-btn { flex: 1 1 100%; }
   .ox-summary { flex-wrap: wrap; }
-  .ox-sum-item { flex: 1 1 30%; border-left: 0; }
+  .ox-sum-item { flex: 1 1 28%; border-left: 0; }
   .mini-grid { grid-template-columns: 1fr; }
+  /* على الجوال: بطاقات الصفوف بدل الجدول العريض، وبحث الصنف أكبر */
+  .ox-table { display: none; }
+  .ox-line-card { display: block; }
+  .ox-lines { flex: 1; }
+  .ox-search-input { font-size: 14px; min-height: 40px; }
+  .ox-field label { white-space: normal; }
+  /* شريط إدخال الصنف: بحث يملأ السطر، الكمية والإضافة صفًا واحدًا تحته */
+  .ox-itembar { flex-wrap: wrap; }
+  .ox-search-cell { flex: 1 1 100%; }
+  .ox-qty { flex: 1 1 48%; width: auto; margin-top: 4px; }
+  .ox-add-btn { flex: 1 1 48%; margin-top: 4px; }
+  /* الشاشة أطول من الشاشة: تمرير داخلي وشريط أوامر مسمّر بالأسفل */
+  .ox-layout { overflow-y: auto; }
+  .ox-cmdbar { position: sticky; bottom: 0; }
 }
 </style>
