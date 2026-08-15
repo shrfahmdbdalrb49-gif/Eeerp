@@ -90,7 +90,7 @@
  *   - toggle        → طي/توسيع القائمة
  *   - select(page)  → النقر على بند نهائي في الشجرة
  */
-import { ref, shallowRef } from 'vue'
+import { ref } from 'vue'
 import {
   LayoutGrid,
   Database,
@@ -147,9 +147,12 @@ const iconMap = {
   CircleQuestionMark,
 }
 
-function Icon({ name }) {
-  return shallowRef(iconMap[name])
-}
+/**
+ * أيقونات lucide v1 هي render functions عارية — لا يجب لفّها بـshallowRef/ref
+ * وإلا سيحوّلها Vue إلى Reactive Proxy وتُعرض كـ"[object Object]" داخل
+ * <component :is="...">. نمرّر الدوال الخام مباشرة.
+ */
+const Icon = (name) => iconMap[name]
 
 /**
  * مكوّن أيقونة السهم الداخلي (chevron-left / chevron-right / chevron-down)
@@ -161,9 +164,7 @@ const chevronMap = {
   'chevron-right': ChevronRight,
   'chevron-down': ChevronDown,
 }
-function ChevronsIcon({ name }) {
-  return shallowRef(chevronMap[name])
-}
+const ChevronsIcon = (name) => chevronMap[name]
 
 /**
  * الأقسام الـ14 الرئيسية — جميع وظائف النظام الحالية موزعة عليها.
