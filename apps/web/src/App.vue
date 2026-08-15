@@ -74,8 +74,8 @@
         <template #returns>
           <ReturnsScreen />
         </template>
-        <template #collections>
-          <CollectionsScreen />
+        <template #collections="{ window: win }">
+          <CollectionsScreen :window-id="win.id" :active="activeWindowId === win.id" :opts="win.opts || {}" />
         </template>
         <template #suppliers>
           <SuppliersScreen />
@@ -206,7 +206,7 @@ const pageWindowTypes = {
   'sales-invoices': { type: 'sales-invoice', title: 'فواتير المبيعات (نقدي / آجل / تأمين)' },
   prescriptions: { type: 'prescriptions', title: 'الوصفات الطبية' },
   returns: { type: 'returns', title: 'مرتجعات المبيعات' },
-  collections: { type: 'collections', title: 'التحصيل' },
+  collections: { type: 'collections', title: 'التحصيل', opts: { tab: 'history' } },
   suppliers: { type: 'suppliers', title: 'الموردون' },
   'purchase-orders': { type: 'generic', title: 'طلبات الشراء' },
   'purchase-invoices': { type: 'purchases', title: 'فواتير المشتريات' },
@@ -266,8 +266,8 @@ const pageWindowTypes = {
   posting: { type: 'journal', title: 'الترحيل المحاسبي' },
   'period-close': { type: 'generic', title: 'إقفال الفترات' },
   'bank-reconciliation': { type: 'generic', title: 'التسويات البنكية' },
-  'aging-customers': { type: 'collections', title: 'أعمار الديون (عملاء / تأمين)' },
-  'aging-suppliers': { type: 'supplier-payments', title: 'أعمار الديون (موردون)' },
+  'aging-customers': { type: 'collections', title: 'أعمار ديون العملاء', opts: { tab: 'aging' } },
+  'aging-suppliers': { type: 'supplier-payments', title: 'أعمار ديون الموردين', opts: { tab: 'aging' } },
   'bad-debt-provision': { type: 'generic', title: 'مخصص الديون المشكوك فيها' },
   'item-cost': { type: 'generic', title: 'تكلفة الأصناف' },
   'avg-cost': { type: 'generic', title: 'متوسط التكلفة' },
@@ -452,6 +452,7 @@ function selectPage(page) {
     status: 'draft',
     minimized: false,
     maximized: false,
+    ...(mapping.opts || {}),
   }
   openWindows.value.push(newWin)
   activeWindowId.value = newId

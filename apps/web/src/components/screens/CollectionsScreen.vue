@@ -143,18 +143,29 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
 import { db, activeCustomers, getStorageMode } from '../../db/database.js'
-import { fmt } from '../../db/engine.js'
-import { postCollectionJournal } from '../../db/engine.js'
+import { fmt, postCollectionJournal } from '../../db/engine.js'
 import { requirePermission, currentSession } from '../../db/session.js'
 import { serverPostCollection } from '../../db/serverOps.js'
 import { apiFetch } from '../../db/api.js'
+
+const winProps = defineProps({
+  windowId: { type: [String, Number], default: null },
+  active: { type: Boolean, default: true },
+  opts: { type: Object, default: () => ({}) },
+})
 
 function isServer() { return getStorageMode() === 'server' }
 
 const collections = ref([])
 const customers = ref([])
 const tab = ref('log')
+
+/** التبويب الافتراضي يُمرَّر من خريطة النوافذ في App.vue عبر opts.tab */
+onMounted(() => {
+  if (winProps.opts && winProps.opts.tab) tab.value = winProps.opts.tab
+})
 const showForm = ref(false)
 const saving = ref(false)
 const formError = ref('')
