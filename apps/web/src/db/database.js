@@ -197,6 +197,34 @@ export async function activeSuppliers() {
 export async function activeAccounts() {
   return (await db.chartOfAccounts.toArray()).filter(isActive)
 }
+/* ---------- تنظيف الحسابات المكررة الخاملة (خلل QA #10) ----------
+   عند تهيئة النظام نزيل أي حساب غير قياسي (خارج دليل seed الافتراضي)
+   يكون بلا حركات قيد (journalLines) — أي حساب أُنشئ يدويًا بالاسم
+   المكرر مثل «إيرادات المبيعات:4000» أو «الصندوق الرئيسي:1010».
+   الحسابات التي عليها حركات لا تُلمس تمامًا. */
+const SEED_NAMES = new Set(['الأصول', 'النقدية والصناديق', 'الصندوق الرئيسي', 'البنك (حساب جاري)', 'الذمم المدينة (عملاء)', 'المخزون', 'الخصوم', 'الذمم الدائنة (موردون)', 'حقوق الملكية', 'رأس المال', 'الإيرادات', 'إيرادات المبيعات', 'مردودات ومسموحات مبيعات', 'المصروفات', 'تكلفة المبيعات', 'المصروفات التشغيلية'])
+export async function sanitizeAccounts() {
+  try {
+    const all = await db.chartOfAccounts.toArray()
+    const lineCounts = await db.journalLines.toArray()
+    const counts = {}
+    lineCounts.forEach(l => { counts[l.accountId] = (counts[l.accountId] || 0) + 1 })
+    const seedCodes = new Set(['1', '1-1', '1-1-1', '1-1-2', '1-2', '1-3', '2', '2-1', '3', '3-1', '4', '4-1', '4-2', '5', '5-1', '5-2'])
+    let removed = 0
+    for (const a of all) {
+      if (seedCodes.has(String(a.code))) continue
+      if (counts[a.id]) continue
+      if (!SEED_NAMES.has((a.name || '').trim())) continue
+      await db.chartOfAccounts.delete(a.id)
+      removed++
+    }
+    if (removed) await audit('accounts_sanitize', 'account', null, 'حذف ' + removed + ' حساب(ات) مكرر(ة) خامل(ة) بلا حركات')
+    return removed
+  } catch (e) {
+    console.warn('[SharafERP] تعذّر تنظيف الحسابات المكررة', e?.message)
+    return 0
+  }
+}
 export { sysAccountsList } from './engine.js'
 export default db
 export { db }

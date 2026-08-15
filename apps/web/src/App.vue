@@ -530,6 +530,15 @@ onMounted(async () => {
     if (!ok) console.warn('[SharafERP] الخادم المركزي غير متاح على', apiBase(), '— لن تعمل العمليات حتى يصبح متصلًا')
   }
   await initSystem()
+  /* تنظيف الحسابات المكررة الخاملة (خلل QA #10: 4000/1010) */
+  if (getStorageMode() === 'local') {
+    try {
+      const { db } = await import('./db/database.js')
+      const { sanitizeAccounts } = await import('./db/database.js')
+      const removed = await sanitizeAccounts(db)
+      if (removed) console.info('[SharafERP] أُزيلت', removed, 'حسابات مكررة خاملة من دليل الحسابات')
+    } catch (e) { console.warn('[SharafERP] تعذّر تنظيف الحسابات المكررة:', e?.message) }
+  }
   const session = await currentSession()
   authenticated.value = !!session
   currentUser.value = session

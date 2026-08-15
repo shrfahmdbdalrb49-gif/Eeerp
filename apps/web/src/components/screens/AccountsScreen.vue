@@ -192,6 +192,7 @@ async function saveAccount() {
     if (isServer()) {
       const f = form.value
       if (!f.name) throw new Error('اسم الحساب مطلوب')
+      if (accounts.value.some(a => a.id !== formEditing.value && (a.name || '').trim() === f.name.trim())) throw new Error('يوجد حساب بنفس الاسم بالفعل')
       const parent = f.parentId ? accounts.value.find(a => a.id === f.parentId) : null
       let code, number, level
       if (parent) {
@@ -216,6 +217,8 @@ async function saveAccount() {
     }
     const f = form.value
     if (!f.name) throw new Error('اسم الحساب مطلوب')
+    const duplicate = accounts.value.find(a => a.id !== formEditing.value && (a.name || '').trim() === f.name.trim())
+    if (duplicate) throw new Error('يوجد حساب بنفس الاسم بالفعل: «' + duplicate.name + '» (كود ' + duplicate.code + ')')
     const siblings = accounts.value.filter(a => a.id !== formEditing.value && a.parentIdRef === (f.parentId || 'root'))
     const nextSeq = siblings.length + 1
     const parent = f.parentId ? accounts.value.find(a => a.id === f.parentId) : null
