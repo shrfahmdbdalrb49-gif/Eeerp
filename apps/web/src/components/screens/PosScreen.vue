@@ -183,7 +183,7 @@ async function checkout() {
     for (const line of cart.value) {
       if (line.qty > line.maxQty) throw new Error(`الكمية المطلوبة من "${line.name}" أكبر من المتاح (${line.maxQty})`)
       const { cogs } = await computeCOGS(line.itemId, line.qty)
-      const consumed = await consumeStock(line.itemId, line.qty)
+      const consumed = await consumeStock(line.itemId, line.qty, { refKind: "sale", refId: saleId })
       await db.salesLines.add({
         invoiceId: saleId, itemId: line.itemId, batchIds: consumed.map(c => c.batchId),
         qty: line.qty, price: line.sellPrice, subtotal: line.qty * line.sellPrice,

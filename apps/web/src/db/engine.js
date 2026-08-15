@@ -215,12 +215,12 @@ export async function itemStock(itemId, asOf) {
   batches.sort((a, b) => (a.expDate || '9999') < (b.expDate || '9999') ? -1 : 1)
   const total = batches.reduce((s, b) => s + b.qty, 0)
   // متوسط التكلفة الموزون
-  const totalCost = batches.reduce((s, b) => s + b.qty * (b.cost || 0), 0)
+  const totalCost = batches.reduce((s, b) => s + b.qty * (b.cost ?? b.costPrice ?? 0), 0)
   return { batches, total, avgCost: total > 0 ? totalCost / total : 0 }
 }
 
 /* ---------- صرف من المخزون (FEFO) — يُستخدم في البيع ---------- */
-export async function consumeStock(itemId, qty) {
+export async function consumeStock(itemId, qty, opts = {}) {
   /* في وضع الخادم المركزي: الخادم ينفذ الصرف تلقائيًا داخل POST /sales — تخطٍّ فقط */
   if (isServer()) return []
   const { batches } = await itemStock(itemId)
@@ -229,13 +229,13 @@ export async function consumeStock(itemId, qty) {
   for (const b of batches) {
     if (remaining <= 0) break
     const take = Math.min(b.qty, remaining)
-    consumed.push({ batchId: b.id, qty: take, cost: b.cost })
+    consumed.push({ batchId: b.id, qty: take, cost: b.cost ?? b.costPrice ?? 0 })
     b.qty -= take
     remaining -= take
     await db.batches.update(b.id, { qty: b.qty })
     if (b.qty === 0) await db.batches.delete(b.id)
     await db.stockMovements.add({
-      itemId, batchId: b.id, kind: 'out', qty: take, refKind: 'sale', refId: null,
+      itemId, batchId: b.id, kind: 'out', qty: take, refKind: opts.refKind || 'sale', refId: opts.refId || null,
       date: new Date().toISOString().slice(0, 10), createdAt: Date.now(),
     })
   }
@@ -252,7 +252,7 @@ export async function computeCOGS(itemId, qty) {
     for (const b of sorted) {
       if (remaining <= 0) break
       const take = Math.min(b.qty, remaining)
-      cogs += take * (b.cost || 0)
+      cogs += take * (b.cost ?? b.costPrice ?? 0)
       remaining -= take
     }
     return { cogs, available: batches.reduce((s, b) => s + b.qty, 0) }
@@ -263,7 +263,7 @@ export async function computeCOGS(itemId, qty) {
   for (const b of sorted) {
     if (remaining <= 0) break
     const take = Math.min(b.qty, remaining)
-    cogs += take * (b.cost || 0)
+    cogs += take * (b.cost ?? b.costPrice ?? 0)
     remaining -= take
   }
   return { cogs, available: batches.reduce((s, b) => s + b.qty, 0) }

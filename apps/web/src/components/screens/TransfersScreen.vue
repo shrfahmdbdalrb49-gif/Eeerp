@@ -222,7 +222,7 @@ async function postTransfer() {
     })
     for (const l of lines.value) {
       // خصم من المخزن المصدر
-      await consumeStock(l.itemId, l.qty)
+      await consumeStock(l.itemId, l.qty, { refKind: "transfer", refId: transferId })
       // إضافة للمخزن المستلم
       const s = await itemStock(l.itemId)
       const avgCost = s.avgCost || 0

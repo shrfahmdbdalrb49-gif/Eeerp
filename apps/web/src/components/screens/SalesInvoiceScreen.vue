@@ -457,7 +457,7 @@ async function persist(inv, isDraft) {
       let cogs = 0, consumed = []
       if (!isDraft) {
         ({ cogs } = await computeCOGS(l.itemId, l.qty))
-        consumed = await consumeStock(l.itemId, l.qty)
+        consumed = await consumeStock(l.itemId, l.qty, { refKind: "sale", refId: saleId })
       }
       await db.salesLines.add({
         invoiceId: saleId, itemId: l.itemId, batchIds: consumed.map(c => c.batchId),
