@@ -290,7 +290,7 @@ const pageWindowTypes = {
   'tax-reports': { type: 'generic', title: 'التقارير الضريبية' },
   'custom-reports': { type: 'generic', title: 'التقارير المخصصة' },
   employees: { type: 'generic', title: 'الموظفون والورديات' },
-  backup: { type: 'generic', title: 'النسخ الاحتياطي' },
+  backup: { type: 'settings', title: 'النسخ الاحتياطي والاستعادة' },
   'notification-settings': { type: 'generic', title: 'إعدادات الإشعارات' },
   'system-monitor': { type: 'generic', title: 'مراقبة النظام' },
   'price-lists': { type: 'generic', title: 'قوائم أسعار البيع' },

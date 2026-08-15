@@ -71,6 +71,7 @@
           <div class="field-row-wide">
             <label>كلمة المرور {{ editing ? '(اتركها فارغة للإبقاء)' : '*' }}</label>
             <input type="password" class="fi" v-model="form.password" autocomplete="new-password" />
+            <span v-if="editing && !form.password" class="pw-note">اتركها فارغة للإبقاء على كلمة المرور الحالية</span>
           </div>
           <div class="field-row-wide">
             <label>الدور</label>
@@ -166,11 +167,14 @@ async function saveUser() {
     }
     const f = { ...form.value }
     if (!f.userName.trim()) throw new Error('أدخل اسم المستخدم')
+    if (!editing.value && (!f.password || f.password.trim().length < 4)) throw new Error('أدخل كلمة مرور لا تقل عن 4 أحرف')
     if (editing.value) {
       const upd = { fullName: f.fullName, role: f.role }
       if (f.password) {
+        if (f.password.trim().length < 4) throw new Error('كلمة المرور الجديدة لا تقل عن 4 أحرف')
         upd.salt = randSalt()
-        upd.passwordHash = hashPassword(f.password, upd.salt)
+        upd.passwordHash = hashPassword(f.password.trim(), upd.salt)
+        await audit('user_password_changed', 'user', editing.value, `تغيير كلمة مرور المستخدم ${f.userName}`)
       }
       await db.users.update(editing.value, upd)
       await audit('user_updated', 'user', editing.value, `تعديل المستخدم ${f.userName}`)
@@ -252,6 +256,7 @@ onMounted(loadData)
 .fi { flex: 1; height: 38px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 12px; font-size: 13px; font-family: inherit; color: #0f172a; background: #fff; outline: none; }
 .fi:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15); }
 .fi[readonly] { background: #f8fafc; color: #94a3b8; }
+.pw-note { font-size: 11px; color: #94a3b8; }
 
 .role-toggles { display: flex; gap: 8px; flex: 1; }
 .role-toggle { flex: 1; height: 38px; border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }

@@ -58,6 +58,16 @@ db.version(2).stores({
   prescriptions: '++id, patientId, doctorId, date, status',
   prescriptionLines: '++id, prescriptionId, itemId',
 })
+
+/* مطابقة التحصيل بالفواتير (المرحلة A): كل سند قبض يربطه صف allocation بفاتورة آجلة محددة */
+db.version(3).stores({
+  paymentAllocations: '++id, collectionId, invoiceId',
+})
+
+/* الفواتير المعلقة (تعليق الفاتورة الحالية والانتقال لفاتورة جديدة دون فقدان البيانات) */
+db.version(4).stores({
+  heldInvoices: '++id, heldAt, heldBy',
+})
 }
 
 /* ---------- أنواع الحسابات وفق النظام القياسي ----------

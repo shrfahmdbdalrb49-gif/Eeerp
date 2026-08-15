@@ -108,7 +108,10 @@ export async function incomeStatement(from, to) {
   const revenues = [], expenses = []
   for (const acc of accounts) {
     const lines = await db.journalLines.where('accountId').equals(acc.id).toArray()
-    const net = lines.reduce((s, l) => s + (Number(l.credit) || 0) - (Number(l.debit) || 0), 0)
+    // الإيرادات: الرصيد = دائن − مدين (موجب) · المصروفات: الرصيد = مدين − دائن (موجب)
+    const creditSum = lines.reduce((s, l) => s + (Number(l.credit) || 0), 0)
+    const debitSum = lines.reduce((s, l) => s + (Number(l.debit) || 0), 0)
+    const net = acc.type === 'Revenue' ? creditSum - debitSum : debitSum - creditSum
     const row = { ...acc, net }
     if (acc.type === 'Revenue') revenues.push(row)
     else expenses.push(row)

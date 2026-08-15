@@ -54,6 +54,23 @@
         <div class="hint">ملاحظة: عند تبديل الوضع ستُطلب منك إعادة تسجيل الدخول.</div>
       </div>
 
+      <!-- النسخ الاحتياطي -->
+      <div class="settings-card" v-if="!isServer">
+        <div class="card-heading"><span class="h-icon">💾</span> النسخ الاحتياطي والاستعادة</div>
+        <p class="section-hint">البيانات محفوظة داخل متصفح هذا الجهاز. صُدّر نسخة احتياطية دورية واحتفظ بها في مكان آمن — فهي طريقك الوحيد لاستعادة البيانات إذا مُسح المتصفح.</p>
+        <div class="backup-row">
+          <button class="btn btn-primary" @click="doExport" :disabled="exporting">
+            <span v-if="exporting" class="spin">⏳</span>
+            <span>{{ exporting ? 'جارٍ التصدير...' : 'تصدير النظام كاملًا (JSON)' }}</span>
+          </button>
+          <label class="btn btn-outline" for="backup-import-file">
+            <span>{{ importing ? 'جارٍ الاستعادة...' : 'استيراد من نسخة احتياطية' }}</span>
+          </label>
+          <input id="backup-import-file" type="file" accept=".json,application/json" style="display:none" @change="doImport" />
+        </div>
+        <div v-if="backupMsg" class="backup-msg" :class="backupMsg.ok ? 'ok' : 'bad'">{{ backupMsg.text }}</div>
+      </div>
+
       <!-- الجلسة -->
       <div class="settings-card">
         <div class="card-heading"><span class="h-icon">🚪</span> تسجيل الخروج</div>
@@ -68,10 +85,15 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { getStorageMode, setStorageMode } from '../../db/storage.js'
 import { apiBase, serverLogout } from '../../db/api.js'
+import { exportToDownload, validateBackup, importSystem, fileToText } from '../../db/backup.js'
+import { requirePermission } from '../../db/session.js'
 
 const mode = ref(getStorageMode())
 const apiUrl = ref(apiBase())
 const serverStatus = ref(null)
+const exporting = ref(false)
+const importing = ref(false)
+const backupMsg = ref(null)
 
 const isServer = computed(() => mode.value === 'server')
 
@@ -101,6 +123,44 @@ async function checkServer() {
 function doLogout() {
   serverLogout().catch(() => {})
   window.dispatchEvent(new CustomEvent('sharaf-logout'))
+}
+
+async function doExport() {
+  exporting.value = true
+  backupMsg.value = null
+  try {
+    await requirePermission('settings', 'تصدير نسخة احتياطية')
+    const size = await exportToDownload()
+    backupMsg.value = { ok: true, text: 'تم تنزيل ملف النسخة الاحتياطية بنجاح (' + Math.round(size / 1024) + ' KB). احتفظ به في مكان آمن.' }
+  } catch (e) {
+    backupMsg.value = { ok: false, text: e.message || 'فشل التصدير' }
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function doImport(ev) {
+  const file = ev.target.files && ev.target.files[0]
+  ev.target.value = ''
+  if (!file) return
+  importing.value = true
+  backupMsg.value = null
+  try {
+    await requirePermission('settings', 'استيراد نسخة احتياطية')
+    const text = await fileToText(file)
+    const payload = await validateBackup(text)
+    const counts = await importSystem(payload, { confirmReplace: true })
+    const total = Object.values(counts).reduce((s, n) => s + n, 0)
+    backupMsg.value = { ok: true, text: 'اكتملت الاستعادة بنجاح (' + total + ' سجلًا). ستُعاد تهيئة النظام — سيتم تسجيل خروجك تلقائيًا.' }
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('sharaf-logout'))
+      setTimeout(() => location.reload(), 300)
+    }, 1500)
+  } catch (e) {
+    backupMsg.value = { ok: false, text: e.message || 'فشل الاستيراد' }
+  } finally {
+    importing.value = false
+  }
 }
 
 onMounted(() => { if (mode.value === 'server') checkServer() })
@@ -154,6 +214,11 @@ onMounted(() => { if (mode.value === 'server') checkServer() })
 .btn:hover { background: #f9fafb; border-color: #9ca3af; }
 .btn-sm { height: 32px; padding: 0 12px; font-size: 12px; }
 .btn-danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+.backup-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.backup-msg { margin-top: 10px; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.backup-msg.ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.backup-msg.bad { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 .btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
 
 @media (min-width: 768px) {

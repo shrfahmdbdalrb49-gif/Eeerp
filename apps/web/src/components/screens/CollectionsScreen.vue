@@ -110,13 +110,31 @@
           </div>
           <div class="field-row-wide">
             <label>المبلغ *</label>
-            <input type="number" class="fi" v-model.number="form.amount" min="0.01" step="0.01" />
+            <input type="number" class="fi" :value="form.amount" min="0.01" step="0.01" @input="setAmount($event.target.value)" placeholder="0.00" />
           </div>
           <div class="field-row-wide">
             <label>الطريقة</label>
             <div class="toggle-group">
               <button type="button" class="toggle" :class="{ on: form.method === 'cash' }" @click="form.method = 'cash'">نقدي (صندوق)</button>
               <button type="button" class="toggle" :class="{ on: form.method === 'bank' }" @click="form.method = 'bank'">تحويل بنكي</button>
+            </div>
+          </div>
+          <div class="field-row-wide">
+            <label>الفواتير الآجلة *</label>
+            <div class="alloc-box">
+              <div class="alloc-list">
+                <div v-for="inv in openInvoices" :key="inv.id" class="alloc-item">
+                  <span class="alloc-ref">{{ inv.doc_no || '#' + inv.id }} — {{ inv.date }}</span>
+                  <span class="alloc-remain">متبقي عليه {{ fmt(inv.remaining) }}</span>
+                  <input type="number" class="alloc-inp fi" min="0" step="0.01" :max="inv.remaining" :value="allocFor(inv.id)" @input="setAlloc(inv.id, $event.target.value)" placeholder="0.00" />
+                </div>
+                <div v-if="!form.customerId" class="alloc-hint">اختر عميلًا أولًا لعرض فواتيره الآجلة المفتوحة</div>
+                <div v-else-if="openInvoices.length === 0" class="alloc-hint">لا توجد فواتير آجلة مفتوحة لهذا العميل</div>
+              </div>
+              <div class="alloc-summary">
+                <span>المخصص للفواتير: <b>{{ fmt(totalAllocated) }}</b> من {{ fmt(form.amount) }}</span>
+                <span class="unalloc-hint" v-if="form.amount && unallocated > 0.005">سيُوزَّع المتبقي ({{ fmt(unallocated) }}) على أقدم الفواتير تلقائيًا</span>
+              </div>
             </div>
           </div>
           <div class="field-row-wide">
@@ -171,6 +189,11 @@ const saving = ref(false)
 const formError = ref('')
 const form = ref({ customerId: null, amount: 0, method: 'cash', date: new Date().toISOString().slice(0, 10), notes: '' })
 
+function setAmount(raw) {
+  const v = parseFloat(raw)
+  form.value = { ...form.value, amount: isNaN(v) ? 0 : v }
+}
+
 const sorted = computed(() => [...collections.value].sort((a, b) => b.id - a.id))
 
 const serverBalances = ref({})
@@ -186,6 +209,84 @@ async function customerDebt(c) {
   return { ...c, creditSales, collected, balance: creditSales - collected }
 }
 
+/** الفواتير الآجلة الخام لعملاء النظام (تُحمّل مرة واحدة) */
+const collectionsFromInvoices = ref([])
+async function loadCreditInvoices() {
+    collectionsFromInvoices.value = await db.salesInvoices.where('paymentType').equals('credit').toArray()
+}
+
+/* ---------- مطابقة سند القبض بالفواتير (paymentAllocations) ---------- */
+const openInvoices = computed(() => {
+  if (!form.value.customerId) return []
+  const cid = form.value.customerId
+  const c = customers.value.find(x => x.id === cid)
+  if (!c || (c.balance || 0) <= 0.005) return []
+  /* جلب الفواتير الآجلة المفتوحة لهذا العميل فعلًا: كل فاتورة صف مستقل للمطابقة */
+  const creditInvoices = collectionsFromInvoices.value.filter(i => i.customerId === cid)
+  const collectedByInvoice = collections.value.filter(x => x.customerId === cid)
+  /* الرصيد المخصص على كل فاتورة (paymentAllocations + التوزيع السابق الافتراضي) */
+  const allocMap = {}
+  for (const x of collections.value.filter(x => x.customerId === cid)) {
+    if (!x.allocations) continue
+    for (const a of x.allocations) { allocMap[a.invoiceId] = (allocMap[a.invoiceId] || 0) + (a.amount || 0) }
+  }
+  const out = creditInvoices
+    .map(inv => {
+      const already = allocMap[inv.id] || 0
+      const remaining = Math.max(0, (inv.total || 0) - already)
+      return { id: inv.id, doc_no: inv.doc_no || ('#' + inv.id), date: inv.date || '', remaining }
+    })
+    .filter(i => i.remaining > 0.005)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+  /* إذا تعذر جلب الفواتير الفردية، سقط إلى صف واحد برصيد العميل المتبقي */
+  if (out.length === 0 && (c.balance || 0) > 0.005) return [{ id: cid, doc_no: null, date: null, remaining: c.balance }]
+  return out
+})
+const allocs = ref({})
+const totalAllocated = computed(() => Object.values(allocs.value).reduce((s, v) => s + (parseFloat(v) || 0), 0))
+const unallocated = computed(() => Math.max(0, (form.value.amount || 0) - totalAllocated.value))
+function allocFor(invId) {
+  if (allocs.value[invId] !== undefined && allocs.value[invId] !== null) return allocs.value[invId]
+  return null
+}
+function setAlloc(invId, raw) {
+  const v = parseFloat(raw)
+  if (isNaN(v) || v <= 0) { const a = { ...allocs.value }; delete a[invId]; allocs.value = a; return }
+  allocs.value = { ...allocs.value, [invId]: v }
+}
+function buildAllocations(total) {
+  const list = openInvoices.value.slice()
+  if (list.length === 0) return []
+  const out = []
+  let remaining = total
+  for (const inv of list) {
+    const explicit = parseFloat(allocs.value[inv.id]) || 0
+    const max = Math.min(inv.remaining, remaining)
+    const amt = explicit > 0 ? Math.min(explicit, max) : 0
+    if (amt > 0.005) {
+      out.push({ invoiceId: inv.id, amount: Math.round(amt * 100) / 100 })
+      remaining -= amt
+    }
+  }
+  /* توزيع المتبقي غير المخصص على أقدم الفواتير */
+  if (remaining > 0.005 && openInvoices.value.length) {
+    const sorted = [...openInvoices.value].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    for (const inv of sorted) {
+      const already = out.find(o => o.invoiceId === inv.id)?.amount || 0
+      const room = inv.remaining - already
+      const amt = Math.min(room, remaining)
+      if (amt > 0.005) {
+        const ex = out.find(o => o.invoiceId === inv.id)
+        if (ex) ex.amount = Math.round((ex.amount + amt) * 100) / 100
+        else out.push({ invoiceId: inv.id, amount: Math.round(amt * 100) / 100 })
+        remaining -= amt
+        if (remaining <= 0.005) break
+      }
+    }
+  }
+  return out
+}
+
 const debtors = computed(() => customers.value.filter(c => (c.balance || 0) > 0).sort((a, b) => b.balance - a.balance))
 const aging = computed(() => customers.value.filter(c => (c.creditSales || 0) > 0).sort((a, b) => b.balance - a.balance))
 const agingTotal = computed(() => ({
@@ -195,6 +296,7 @@ const agingTotal = computed(() => ({
 }))
 
 async function loadData() {
+  if (!isServer()) await loadCreditInvoices()
   if (isServer()) {
     try {
       const raw = await activeCustomers()
@@ -218,6 +320,7 @@ async function loadData() {
 
 function openNew() {
   formError.value = ''
+  allocs.value = {}
   form.value = { customerId: null, amount: 0, method: 'cash', date: new Date().toISOString().slice(0, 10), notes: '' }
   showForm.value = true
 }
@@ -245,6 +348,9 @@ async function save() {
     const debtor = debtors.value.find(c => c.id === f.customerId)
     if (!debtor) throw new Error('العميل لا يملك ذمم مستحقة')
     if (f.amount > debtor.balance + 0.005) throw new Error(`المبلغ أكبر من ذمم العميل (${fmt(debtor.balance)})`)
+    const totalAlloc = Object.values(allocs.value).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+    const maxPossible = openInvoices.value.reduce((s, inv) => s + inv.remaining, 0)
+    if (totalAlloc > maxPossible + 0.005) throw new Error('المبلغ المخصص لفاتورة يتجاوز المتبقي عليها')
     const { nextDocNo } = await import('../../db/sequences.js')
     const voucherNo = await nextDocNo('receipt', new Date(f.date).getFullYear())
     const id = await db.collections.add({
@@ -252,6 +358,12 @@ async function save() {
       notes: f.notes, status: 'posted', createdAt: Date.now(),
       voucher_no: voucherNo,
     })
+    const allocations = buildAllocations(f.amount)
+    if (allocations.length > 0) {
+      await db.paymentAllocations.bulkAdd(allocations.map(a => ({
+        collectionId: id, invoiceId: a.invoiceId, amount: a.amount, createdAt: Date.now(),
+      })))
+    }
     await postCollectionJournal({ collectionId: id, amount: f.amount, method: f.method })
     const s = await currentSession()
     await db.auditLogs.add({ userId: s?.userId ?? 0, userName: s?.userName ?? 'مجهول', action: 'collection_posted', refKind: 'collection', refId: id, detail: null, createdAt: Date.now() })

@@ -16,6 +16,10 @@ export const DOC_TYPES = {
   payment: { prefix: 'PAY', label: 'سند صرف' },
   journal: { prefix: 'JE', label: 'قيد يومية' },
   transfer: { prefix: 'TRF', label: 'تحويل مخزني' },
+  customer: { prefix: 'CUS', label: 'عميل' },
+  item: { prefix: 'ITM', label: 'صنف' },
+  supplier: { prefix: 'SUP', label: 'مورد' },
+  expense: { prefix: 'EXP', label: 'مصروف تشغيلي' },
 }
 
 const DB_NAME = 'SharafERP'
