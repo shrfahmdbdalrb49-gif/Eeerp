@@ -1,6 +1,8 @@
 [build]
 builder = "NIXPACKS"
-nixpacksPlan.phases.setup.nixPkgs = ["nodejs-20_x"]
+
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["nodejs-20_x"]
 
 [deploy]
 startCommand = "npm install --omit=dev && node server.js"
