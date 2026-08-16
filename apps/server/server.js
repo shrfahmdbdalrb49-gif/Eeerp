@@ -32,6 +32,7 @@ app.use(cors({ origin: true, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 
 app.get('/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', ts: new Date().toISOString() }))
+app.get('/api/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', ts: new Date().toISOString() }))
 
 /* جميع نقاط API تحت /api */
 app.use('/api/auth', authRoutes)
