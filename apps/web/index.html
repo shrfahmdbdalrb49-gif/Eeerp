@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>شرف ERP - نظام إدارة الصيدليات</title>
-  <link rel="manifest" href="/Eeerp/assets/manifest.webmanifest" />
+  <link rel="manifest" href="/Eeerp/manifest.webmanifest" />
   <meta name="theme-color" content="#1f6feb" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="شرف ERP" />
-  <link rel="apple-touch-icon" href="/Eeerp/assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="/Eeerp/icon-192.png" />
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/Eeerp/assets/sw.js', { scope: '/Eeerp/' })
+        navigator.serviceWorker.register('/Eeerp/sw.js', { scope: '/Eeerp/' })
           .catch((err) => console.warn('SW registration failed:', err));
       });
     }
