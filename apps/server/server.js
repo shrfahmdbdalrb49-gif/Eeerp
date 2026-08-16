@@ -46,6 +46,8 @@ app.use('/api/supplier-payments', supplierPaymentsRoutes)
 app.use('/api/journals', journalsRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/audit', auditRoutes)
+app.use('/api/setup', setupRoutes)
+import setupRoutes from './routes/setup.routes.js'
 app.use('/api/branches', branchesRouter)
 app.use('/api/stores', storesRouter)
 app.use('/api/cash-boxes', cashBoxesRouter)
