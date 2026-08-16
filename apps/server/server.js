@@ -50,8 +50,14 @@ app.use('/api/cash-boxes', cashBoxesRouter)
 app.use('/api/customers', customersRouter)
 app.use('/api/suppliers', suppliersRouter)
 
-/* ملفات ثابتة: البناء الأمامي نفسه (اختياري) */
-app.use(express.static(join(__dirname, '..', 'dist')))
+/* ملفات ثابتة: البناء الأمامي نفسه (مجلد serve بمسارات جذرية) */
+const serveDir = join(__dirname, '..', '..', 'serve')
+app.use(express.static(serveDir))
+/* أي مسار آخر (SPA) يعيد الصفحة الرئيسية */
+app.use((req, res, next) => {
+  if (!req.accepts('html')) return next()
+  res.sendFile(join(serveDir, 'index.html'))
+})
 
 /* خطأ 404 */
 app.use((req, res) => res.status(404).json({ error: 'endpoint not found: ' + req.originalUrl }))
