@@ -3,6 +3,8 @@
    API كامل + PostgreSQL + JWT + RBAC + محاسبة مزدوجة
    ============================================ */
 import express from 'express'
+import { getPool } from './config/db.js'
+import { autoSetup } from './auto-setup.js'
 import cors from 'cors'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -69,14 +71,11 @@ app.use((err, req, res, next) => {
 })
 
 /* التهيئة التلقائية: إنشاء الجداول والبيانات الأولية عند أول تشغيل */
-import { getPool } from './config/db.js'
-import { autoSetup } from './auto-setup.js'
 autoSetup(getPool()).catch(() => {})
-
-app.listen(PORT, '0.0.0.0', async () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Sharaf ERP API listening on port ${PORT}`)
   // إعادة محاولة التهيئة إذا فشلت في أول محاولة
-  await autoSetup(getPool()).catch(() => {})
+  autoSetup(getPool()).catch(() => {})
 })
 
 export default app
