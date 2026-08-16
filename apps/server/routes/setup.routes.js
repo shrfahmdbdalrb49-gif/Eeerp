@@ -17,11 +17,12 @@ router.post('/retry', async (req, res) => {
     const { readFile } = await import('fs/promises')
     const { fileURLToPath } = await import('url')
     const { dirname, join } = await import('path')
+    const { splitSQL } = await import('../sql/split.js')
     const dir = dirname(fileURLToPath(import.meta.url))
     const errors = []
     // 1) تهيئة الجداول
     const schema = await readFile(join(dir, '..', 'sql', 'schema.sql'), 'utf8')
-    const stmts = schema.split(/;\s*\n/).map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith('--'))
+    const stmts = splitSQL(schema)
     let ok = 0
     for (const stmt of stmts) {
       try { await pool.query(stmt); ok++ }
@@ -30,7 +31,7 @@ router.post('/retry', async (req, res) => {
     try { await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto') } catch (e) { errors.push(`pgcrypto: ${e.message}`) }
     // 2) البيانات الأولية
     const seed = await readFile(join(dir, '..', 'sql', 'seed.sql'), 'utf8')
-    const seedStmts = seed.split(/;\s*\n/).map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith('--'))
+    const seedStmts = splitSQL(seed)
     for (const stmt of seedStmts) {
       try { await pool.query(stmt) }
       catch (e) { errors.push(`seed: ${e.message}`) }

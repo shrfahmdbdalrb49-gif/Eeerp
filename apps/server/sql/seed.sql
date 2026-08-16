@@ -90,7 +90,20 @@ ON CONFLICT (role_name, permission) DO NOTHING;
 -- ---------- دليل الحسابات المحاسبي القياسي ----------
 INSERT INTO chart_of_accounts (code, number, name, type, parent_id, balance_direction, sort_order) VALUES
   ('1', '1', 'الأصول', 'asset', NULL, 'debit', 1),
+  ('2', '2', 'الخصوم', 'liability', NULL, 'credit', 20),
+  ('3', '3', 'حقوق الملكية', 'equity', NULL, 'credit', 40),
+  ('4', '4', 'الإيرادات', 'revenue', NULL, 'credit', 60),
+  ('5', '5', 'المصروفات', 'expense', NULL, 'debit', 80)
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO chart_of_accounts (code, number, name, type, parent_id, balance_direction, sort_order) VALUES
   ('11', '11', 'الأصول المتداولة', 'asset', 1, 'debit', 2),
+  ('21', '21', 'الخصوم المتداولة', 'liability', 2, 'credit', 21),
+  ('41', '41', 'إيرادات المبيعات', 'revenue', 4, 'credit', 61),
+  ('42', '42', 'مردودات ومقاصة المبيعات', 'revenue', 4, 'debit', 65),
+  ('51', '51', 'تكلفة المبيعات', 'expense', 5, 'debit', 81),
+  ('52', '52', 'المصروفات التشغيلية', 'expense', 5, 'debit', 90)
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO chart_of_accounts (code, number, name, type, parent_id, balance_direction, sort_order) VALUES
   ('1101', '1101', 'الصندوق الرئيسي', 'asset', 11, 'debit', 3),
   ('1102', '1102', 'الصندوق الفرعي', 'asset', 11, 'debit', 4),
   ('1103', '1103', 'البنك - الحساب الجاري', 'asset', 11, 'debit', 5),
@@ -99,26 +112,17 @@ INSERT INTO chart_of_accounts (code, number, name, type, parent_id, balance_dire
   ('1106', '1106', 'الشيكات المستلمة', 'asset', 11, 'debit', 8),
   ('1107', '1107', 'العهدة الفرعية', 'asset', 11, 'debit', 9),
   ('1108', '1108', 'سلف الموظفين', 'asset', 11, 'debit', 10),
-  ('2', '2', 'الخصوم', 'liability', NULL, 'credit', 20),
-  ('21', '21', 'الخصوم المتداولة', 'liability', 2, 'credit', 21),
   ('2101', '2101', 'الموردون - الذمم الدائنة', 'liability', 21, 'credit', 22),
   ('2102', '2102', 'الشيكات المعطاة', 'liability', 21, 'credit', 23),
   ('2103', '2103', 'رواتب مستحقة الدفع', 'liability', 21, 'credit', 24),
   ('2104', '2104', 'الضرائب المستحقة', 'liability', 21, 'credit', 25),
-  ('3', '3', 'حقوق الملكية', 'equity', NULL, 'credit', 40),
   ('3101', '3101', 'رأس المال', 'equity', 3, 'credit', 41),
   ('3102', '3102', 'الأرباح المحتجزة', 'equity', 3, 'credit', 42),
-  ('4', '4', 'الإيرادات', 'revenue', NULL, 'credit', 60),
-  ('41', '41', 'إيرادات المبيعات', 'revenue', 4, 'credit', 61),
   ('4101', '4101', 'إيرادات المبيعات', 'revenue', 41, 'credit', 62),
   ('4102', '4102', 'إيرادات صرف الوصفات', 'revenue', 41, 'credit', 63),
   ('4103', '4103', 'إيرادات أخرى', 'revenue', 41, 'credit', 64),
-  ('42', '42', 'مردودات ومقاصة المبيعات', 'revenue', 4, 'debit', 65),
-  ('5', '5', 'المصروفات', 'expense', NULL, 'debit', 80),
-  ('51', '51', 'تكلفة المبيعات', 'expense', 5, 'debit', 81),
   ('5101', '5101', 'تكلفة الأصناف المباعة', 'expense', 51, 'debit', 82),
   ('5102', '5102', 'مرجعيات ومردودات المبيعات', 'expense', 51, 'debit', 83),
-  ('52', '52', 'المصروفات التشغيلية', 'expense', 5, 'debit', 90),
   ('5201', '5201', 'رواتب وأجور', 'expense', 52, 'debit', 91),
   ('5202', '5202', 'إيجارات', 'expense', 52, 'debit', 92),
   ('5203', '5203', 'كهرباء وماء', 'expense', 52, 'debit', 93),

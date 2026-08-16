@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
   number text NOT NULL,                 -- رقم العرض (قد يكرر الفروع)
   name text NOT NULL,
   type text NOT NULL,                   -- asset, liability, equity, revenue, expense
-  parent_id int REFERENCES chart_of_accounts(id) ON DELETE SET NULL,
+  parent_id text REFERENCES chart_of_accounts(code) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED,
   balance_direction text CHECK (balance_direction IN ('debit','credit')),
   is_contra boolean NOT NULL DEFAULT false,
   active boolean NOT NULL DEFAULT true,

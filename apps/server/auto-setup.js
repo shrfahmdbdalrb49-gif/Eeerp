@@ -6,6 +6,7 @@
 import { readFile } from 'fs/promises'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { splitSQL } from './sql/split.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -15,27 +16,42 @@ export async function autoSetup(pool) {
   try {
     const schema = await readFile(join(__dirname, 'sql', 'schema.sql'), 'utf8')
     // تنفيذ أوامر CREATE TABLE واحدة تلو الأخرى (pg.query لا يدعم pg_multiple_statements الافتراضي)
-    const statements = schema.split(/;\s*\n/).map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith('--'))
+    const statements = splitSQL(schema)
+    console.log(`📦 عدد أوامر المخطط: ${statements.length}`)
+    let ok = 0
+    let fail = 0
     for (const stmt of statements) {
-      // تخطي أوامر CREATE INDEX المنفصلة (إن وجدت) — ستُنفذ مع جدولها
-      await pool.query(stmt)
+      try {
+        await pool.query(stmt)
+        ok++
+      } catch (e) {
+        fail++
+        console.error(`⚠️ فشل أمر المخطط [${ok + fail}]: ${e.message}`)
+      }
     }
-    console.log(`✅ تم إنشاء ${statements.length} أمر CREATE TABLE/INDEX`)
+    console.log(`✅ ${ok} أمر مخطط نجح، ${fail} فشل`)
 
     // تفعيل امتداد pgcrypto لاستخدام crypt() و gen_salt() في seed.sql
     await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto')
 
     const seed = await readFile(join(__dirname, 'sql', 'seed.sql'), 'utf8')
-    const seedStatements = seed.split(/;\s*\n/).map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith('--'))
+    const seedStatements = splitSQL(seed)
+    let seedOk = 0
+    let seedFail = 0
     for (const stmt of seedStatements) {
-      await pool.query(stmt)
+      try {
+        await pool.query(stmt)
+        seedOk++
+      } catch (e) {
+        seedFail++
+        console.error(`⚠️ فشل أمر بيانات [${seedOk + seedFail}]: ${e.message}`)
+      }
     }
-    console.log(`✅ تم تنفيذ ${seedStatements.length} أمر بيانات أولية (أدوار، حسابات، مستخدم admin)`)
+    console.log(`✅ ${seedOk} أمر بيانات أولية (أدوار، حسابات، مستخدم admin) نجح، ${seedFail} فشل`)
     console.log('🔐 بيانات الدخول: admin / Admin@1234 (يُفضَّل تغييرها)')
     return true
   } catch (err) {
-    console.error('⚠️ فشل التهيئة التلقائية:', err.message)
-    console.error('💡 قد تكون الجداول موجودة مسبقًا — يستمر الخادم بالعمل.')
+    console.error('⚠️ فشل التهيئة التلقائية كليًا:', err.message)
     return false
   }
 }

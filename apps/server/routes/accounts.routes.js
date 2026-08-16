@@ -29,7 +29,7 @@ router.post('/', requireAuth, requirePermission('accounts.write'), async (req, r
     const { rows } = await query(
       `INSERT INTO chart_of_accounts (code, number, name, type, parent_id, balance_direction, sort_order)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [String(code).trim(), number || String(code), name, type, parent_id != null ? Number(parent_id) : null,
+      [String(code).trim(), number || String(code), name, type, parent_id != null ? String(parent_id).trim() || null : null,
        balance_direction || 'debit', sort_order != null ? Number(sort_order) : null],
     )
     await auditLog(req, 'account.create', 'account', rows[0].id, { code })
@@ -46,7 +46,7 @@ router.patch('/:id', requireAuth, requirePermission('accounts.write'), async (re
     let i = 1
     if (name != null) { parts.push(`name = $${i++}`); values.push(name) }
     if (type != null) { parts.push(`type = $${i++}`); values.push(type) }
-    if (parent_id != null) { parts.push(`parent_id = $${i++}`); values.push(Number(parent_id)) }
+    if (parent_id != null) { parts.push(`parent_id = $${i++}`); values.push(String(parent_id).trim() || null) }
     if (balance_direction != null) { parts.push(`balance_direction = $${i++}`); values.push(balance_direction) }
     if (sort_order != null) { parts.push(`sort_order = $${i++}`); values.push(Number(sort_order)) }
     if (!parts.length) return res.status(400).json({ error: 'لا توجد بيانات للتعديل' })
