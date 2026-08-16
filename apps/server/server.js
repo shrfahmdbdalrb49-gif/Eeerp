@@ -62,8 +62,15 @@ app.use((err, req, res, next) => {
   res.status(err?.status || 500).json({ error: err?.message || 'خطأ داخلي في الخادم' })
 })
 
-app.listen(PORT, '0.0.0.0', () => {
+/* التهيئة التلقائية: إنشاء الجداول والبيانات الأولية عند أول تشغيل */
+import { getPool } from './config/db.js'
+import { autoSetup } from './auto-setup.js'
+autoSetup(getPool()).catch(() => {})
+
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅ Sharaf ERP API listening on port ${PORT}`)
+  // إعادة محاولة التهيئة إذا فشلت في أول محاولة
+  await autoSetup(getPool()).catch(() => {})
 })
 
 export default app
