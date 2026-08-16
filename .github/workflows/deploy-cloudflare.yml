@@ -28,8 +28,11 @@ jobs:
       - name: Build Sharaf ERP for Cloudflare (base path = /) into dist-cf-root
         run: ./build.sh
 
+      - name: Install Wrangler
+        run: npm install -g wrangler@4
+
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy dist-cf-root --project-name=sharaf-erp
+        run: wrangler pages deploy dist-cf-root --project-name=sharaf-erp --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
