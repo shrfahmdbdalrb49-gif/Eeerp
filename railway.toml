@@ -1,6 +1,12 @@
 [build]
 builder = "NIXPACKS"
 
+[nixpacksPhases.setup]
+nixPkgs = ["nodejs-20_x"]
+
+[nixpacksPhases.install]
+ cmds = ["npm install --omit=dev"]
+
 [deploy]
 startCommand = "npm install --omit=dev && node server.js"
 restartPolicyType = "ON_FAILURE"
