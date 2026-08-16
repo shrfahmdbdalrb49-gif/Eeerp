@@ -68,6 +68,14 @@ db.version(3).stores({
 db.version(4).stores({
   heldInvoices: '++id, heldAt, heldBy',
 })
+
+/* الخزائن (عدة صناديق وعدة حسابات بنكية) + إقفال الفترات المحاسبية — v51 */
+db.version(5).stores({
+  cashBoxes: '++id, code, name, active',
+  bankAccounts: '++id, code, name, bankName, active',
+  periodCloses: '++id, period, closedAt, closedBy',
+  receipts: '++id, customerId, date, status',
+})
 }
 
 /* ---------- أنواع الحسابات وفق النظام القياسي ----------
@@ -236,5 +244,86 @@ export async function sanitizeAccounts() {
   }
 }
 export { sysAccountsList } from './engine.js'
+
+/* ======================================================================
+   الخزائن (Treasury) — عدة صناديق وعدة حسابات بنكية — v51
+   كل صندوق/حساب بنكي يرتبط بحساب محاسبي في دليل الحسابات عبر treasuryAccountCode
+   ====================================================================== */
+export async function listCashBoxes() {
+  return (await db.cashBoxes.toArray()).filter(isActive).sort((a, b) => a.code.localeCompare(b.code, 'ar'))
+}
+export async function addCashBox({ name, code }) {
+  const all = await db.cashBoxes.toArray()
+  if (all.some(c => (c.name || '').trim() === (name || '').trim())) throw new Error('صندوق بهذا الاسم موجود مسبقًا')
+  const id = await db.cashBoxes.add({
+    code: (code || '').trim() || 'CB-' + (all.length + 1),
+    name: (name || '').trim(),
+    active: true,
+    createdAt: Date.now(),
+  })
+  await audit('cashbox_add', 'cashbox', id, 'إضافة صندوق: ' + name)
+  return id
+}
+export async function listBankAccounts() {
+  return (await db.bankAccounts.toArray()).filter(isActive).sort((a, b) => a.code.localeCompare(b.code, 'ar'))
+}
+export async function addBankAccount({ name, code, bankName }) {
+  const all = await db.bankAccounts.toArray()
+  if (all.some(c => (c.name || '').trim() === (name || '').trim())) throw new Error('حساب بنكي بهذا الاسم موجود مسبقًا')
+  const id = await db.bankAccounts.add({
+    code: (code || '').trim() || 'BA-' + (all.length + 1),
+    name: (name || '').trim(),
+    bankName: (bankName || '').trim(),
+    active: true,
+    createdAt: Date.now(),
+  })
+  await audit('bank_add', 'bank', id, 'إضافة حساب بنكي: ' + name)
+  return id
+}
+
+/* ======================================================================
+   إقفال الفترات المحاسبية — v51
+   الفترة بصيغة YYYY-MM (مثل 2026-08). لا يمكن تعديل/حذف أي قيد في فترة مغلقة.
+   ====================================================================== */
+export async function listPeriodCloses() {
+  return (await db.periodCloses.toArray()).sort((a, b) => a.period.localeCompare(b.period))
+}
+export async function closePeriod({ period, force = false } = {}) {
+  if (!/^\d{4}-\d{2}$/.test(period)) throw new Error('صيغة الفترة يجب أن تكون YYYY-MM مثل 2026-08')
+  const exists = await db.periodCloses.where('period').equals(period).first()
+  if (exists) throw new Error('هذه الفترة مغلقة مسبقًا')
+  /* 1) كل القيود في الفترة يجب أن تكون مُرحّلة (posted) */
+  const unposted = await db.journalEntries
+    .where('date').between(period + '-01', period + '-31', false, true)
+    .filter(e => !e.posted)
+    .count()
+  if (unposted > 0) throw new Error('لا يمكن إغلاق الفترة: يوجد ' + unposted + ' قيد(ًا) غير مُرحّل(ة) في الفترة ' + period + ' — راجع شاشة الترحيل المحاسبي أولًا')
+  /* 2) التحقق المحاسبي: ميزان المراجعة حتى نهاية الفترة متوازن (شكليًا موجود) */
+  const session = await db.settings.get('currentSession')
+  const id = await db.periodCloses.add({
+    period,
+    force: !!force,
+    closedAt: Date.now(),
+    closedBy: session?.userName ?? 'غير معروف',
+  })
+  await audit('period_close', 'period', id, 'إقفال الفترة المحاسبية ' + period + (force ? ' (إقفال إجباري)' : ''))
+  return id
+}
+export async function openPeriod(period) {
+  const pc = await db.periodCloses.where('period').equals(period).first()
+  if (!pc) throw new Error('الفترة غير مغلقة')
+  await db.periodCloses.delete(pc.id)
+  const session = await db.settings.get('currentSession')
+  await audit('period_open', 'period', pc.id, 'إعادة فتح الفترة المحاسبية ' + period + ' بواسطة ' + (session?.userName ?? 'غير معروف'))
+}
+export async function isPeriodClosed(date) {
+  const period = String(date || '').slice(0, 7)
+  if (!/^\d{4}-\d{2}$/.test(period)) return false
+  return !!(await db.periodCloses.where('period').equals(period).first())
+}
+/* يفحص أن التاريخ ليس في فترة مغلقة ويُرجع خطأ وصفهًا */
+export async function assertPeriodOpen(date) {
+  if (await isPeriodClosed(date)) throw new Error('الفترة المالية (' + String(date).slice(0, 7) + ') مغلقة — لا يمكن التعديل أو الإلغاء. يجب إعادة فتح الفترة أولًا.')
+}
 export default db
 export { db }

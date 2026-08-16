@@ -92,6 +92,18 @@
         <template #journal>
           <JournalScreen />
         </template>
+        <template #opening-entries>
+          <OpeningEntriesScreen />
+        </template>
+        <template #posting>
+          <PostingScreen />
+        </template>
+        <template #period-close>
+          <PeriodCloseScreen />
+        </template>
+        <template #treasury>
+          <TreasuryScreen />
+        </template>
         <template #reports>
           <ReportsScreen />
         </template>
@@ -161,6 +173,10 @@ import TransfersScreen from './components/screens/TransfersScreen.vue'
 import UsersScreen from './components/screens/UsersScreen.vue'
 import SettingsScreen from './components/screens/SettingsScreen.vue'
 import PlaceholderScreen from './components/screens/PlaceholderScreen.vue'
+import OpeningEntriesScreen from './components/screens/OpeningEntriesScreen.vue'
+import PostingScreen from './components/screens/PostingScreen.vue'
+import PeriodCloseScreen from './components/screens/PeriodCloseScreen.vue'
+import TreasuryScreen from './components/screens/TreasuryScreen.vue'
 
 // ---- الحالة ----
 // ---- المصادقة ----
@@ -220,7 +236,9 @@ const pageWindowTypes = {
   'insurance-claims': { type: 'generic', title: 'المطالبات' },
   accounts: { type: 'accounts', title: 'دليل الحسابات' },
   journal: { type: 'journal', title: 'القيود اليومية' },
-  treasury: { type: 'generic', title: 'الصندوق والبنوك' },
+  treasury: { type: 'treasury', title: 'الصندوق والبنوك' },
+  'cash-boxes': { type: 'treasury', title: 'الصناديق' },
+  banks: { type: 'treasury', title: 'البنوك' },
   payable: { type: 'supplier-payments', title: 'الذمم (الموردون)' },
   receivable: { type: 'collections', title: 'الذمم (العملاء)' },
   'reports-sales': { type: 'reports', title: 'تقارير المبيعات' },
@@ -256,15 +274,13 @@ const pageWindowTypes = {
   approvals: { type: 'generic', title: 'الموافقات' },
   'rejected-claims': { type: 'generic', title: 'المطالبات المرفوضة' },
   settlements: { type: 'generic', title: 'التسويات' },
-  'cash-boxes': { type: 'generic', title: 'الصناديق' },
-  banks: { type: 'generic', title: 'البنوك' },
   'receipt-voucher': { type: 'receipt-voucher', title: 'سند قبض' },
   'payment-voucher': { type: 'payment-voucher', title: 'سند صرف' },
   'financial-transfers': { type: 'generic', title: 'التحويلات المالية' },
   cheques: { type: 'generic', title: 'الشيكات' },
-  'opening-entries': { type: 'journal', title: 'القيود الافتتاحية' },
-  posting: { type: 'journal', title: 'الترحيل المحاسبي' },
-  'period-close': { type: 'generic', title: 'إقفال الفترات' },
+  'opening-entries': { type: 'opening-entries', title: 'القيود الافتتاحية' },
+  posting: { type: 'posting', title: 'الترحيل المحاسبي' },
+  'period-close': { type: 'period-close', title: 'إقفال الفترات' },
   'bank-reconciliation': { type: 'generic', title: 'التسويات البنكية' },
   'aging-customers': { type: 'collections', title: 'أعمار ديون العملاء', opts: { tab: 'aging' } },
   'aging-suppliers': { type: 'supplier-payments', title: 'أعمار ديون الموردين', opts: { tab: 'aging' } },

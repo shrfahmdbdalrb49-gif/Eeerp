@@ -3,7 +3,7 @@
    كل قيد يُضاف عبر postJournalEntry مع توازن إجباري (debit = credit)
    المخزون يُدار بال_batches مع FEFO
    ============================================ */
-import { db, audit, ACCOUNT_TYPE_LABEL, activeAccounts } from './database.js'
+import { db, audit, ACCOUNT_TYPE_LABEL, activeAccounts, listCashBoxes, listBankAccounts, listPeriodCloses as listPeriodClosesDb, isPeriodClosed, assertPeriodOpen } from './database.js'
 import { getStorageMode } from './storage.js'
 import { apiFetch } from './api.js'
 import * as engineServer from './engineServer.js'
@@ -353,6 +353,7 @@ export async function cancelSaleLocal(saleId) {
   const sale = await db.salesInvoices.get(saleId)
   if (!sale) throw new Error('الفاتورة غير موجودة')
   if (sale.status === 'cancelled') return
+  await assertPeriodOpen(sale.date)
   /* 1. منع الإلغاء إذا كان هناك تحصيلات مرتبطة (يجب عكسها يدويًا أولًا) */
   const cols = await db.collections.where('customerId').equals(sale.customerId).toArray()
   const totalCollected = cols.reduce((s, x) => s + (x.amount || 0), 0)
@@ -397,6 +398,7 @@ export async function cancelPurchaseLocal(purchaseId) {
   const inv = await db.purchaseInvoices.get(purchaseId)
   if (!inv) throw new Error('الفاتورة غير موجودة')
   if (inv.status === 'cancelled') return
+  await assertPeriodOpen(inv.date)
   const pays = await db.supplierPayments.where('supplierId').equals(inv.supplierId).toArray()
   const totalPaid = pays.reduce((s, x) => s + (x.amount || 0), 0)
   if (totalPaid > 0.005) {
@@ -458,12 +460,139 @@ export async function postSupplierPaymentJournal({ paymentId, amount, method, op
 
 /* ---------- قيد قيد يدوي من شاشة القيود اليومية ---------- */
 export async function postManualJournal({ date, description, lines }) {
+  await assertPeriodOpen(date)
   await postJournalEntry({ date, description, refKind: 'manual', refId: null, lines })
 }
 
 /* ---------- قيد افتتاحي ---------- */
 export async function postOpeningJournal({ date, description, lines }) {
+  await assertPeriodOpen(date)
   await postJournalEntry({ date, description, refKind: 'opening', refId: null, lines })
+}
+
+/* ======================================================================
+   الخزائن (Treasury) — v51: عدة صناديق وعدة حسابات بنكية
+   ========================================================= */
+export async function treasuryBalance(accountId, asOf) {
+  const lines = await db.journalLines.where('accountId').equals(accountId).toArray()
+  let balance = 0
+  for (const l of lines) {
+    const entry = await db.journalEntries.get(l.entryId)
+    if (!entry) continue
+    if (asOf && String(entry.date || '') > String(asOf)) continue
+    balance += (Number(l.debit) || 0) - (Number(l.credit) || 0)
+  }
+  return balance
+}
+export async function treasurySummary() {
+  const accounts = await sysAccountsList()
+  const mainCash = accounts.find(a => a.code === '1-1-1')
+  const mainBank = accounts.find(a => a.code === '1-1-2')
+  const cashBoxes = await listCashBoxes()
+  const banks = await listBankAccounts()
+  const [mainCashBalance, mainBankBalance] = await Promise.all([
+    mainCash ? treasuryBalance(mainCash.id) : Promise.resolve(0),
+    mainBank ? treasuryBalance(mainBank.id) : Promise.resolve(0),
+  ])
+  return {
+    mainCash: { id: mainCash?.id || null, name: mainCash?.name || 'الصندوق الرئيسي', code: '1-1-1', balance: mainCashBalance },
+    mainBank: { id: mainBank?.id || null, name: mainBank?.name || 'البنك (حساب جاري)', code: '1-1-2', balance: mainBankBalance },
+    cashBoxes,
+    banks,
+  }
+}
+
+/* ======================================================================
+   إقفال الفترات المحاسبية — v51
+   الفترة بصيغة YYYY-MM. لا يمكن التعديل/الإلغاء/النشر في فترة مغلقة.
+   ========================================================= */
+export async function listPeriodCloses() { return await listPeriodClosesDb() }
+/* ميزان المراجعة حتى نهاية تاريخ معين (للتأكد من توازن الأصول = الخصوم + الحقوق عند الإقفال) */
+export async function trialBalanceAsOf(asOf) {
+  /* أرصدة تراكمية حتى تاريخ asOf — تُحسب من سطور القيود بتاريخ القيد نفسه
+     (وليس من ميزان المراجعة اللحظي، لأن trialBalance لا يحمل تاريخًا لكل صف) */
+  const accounts = await sysAccountsList()
+  const accMap = new Map(accounts.map(a => [a.id, a]))
+  const limit = asOf || '9999-12-31'
+  let assetsDr = 0, liabilitiesCr = 0, equityCr = 0, revenueCr = 0, expenseDr = 0
+  for (const acc of accounts) {
+    const lines = await db.journalLines.where('accountId').equals(acc.id).toArray()
+    let debit = 0, credit = 0
+    for (const l of lines) {
+      const entry = await db.journalEntries.get(l.entryId)
+      if (!entry) continue
+      if (String(entry.date || '') > String(limit)) continue
+      debit += Number(l.debit) || 0
+      credit += Number(l.credit) || 0
+    }
+    const t = (acc.type || '').toString()
+    let balance = 0
+    if (t === 'Assets' || t === 'Expense') balance = (acc.openingDebit || 0) + debit - credit
+    else balance = (acc.openingCredit || 0) + credit - debit
+    const row = { ...acc, debit, credit, balance }
+    if (acc.type === 'Assets') assetsDr += balance
+    else if (acc.type === 'Liabilities') liabilitiesCr += balance
+    else if (acc.type === 'Equity') equityCr += balance
+    else if (acc.type === 'Revenue') revenueCr += balance
+    else if (acc.type === 'Expense') expenseDr += balance
+  }
+  const totalAssets = assetsDr
+  const totalClaims = liabilitiesCr + equityCr + revenueCr - expenseDr
+  return {
+    assets: totalAssets,
+    claims: totalClaims,
+    balanced: Math.abs(totalAssets - totalClaims) < 0.01,
+    rows: { assetsDr, liabilitiesCr, equityCr, revenueCr, expenseDr },
+  }
+}
+
+/* قيود معلقة غير مُرحّلة في نطاق تاريخي */
+export async function pendingJournalEntries(from, to) {
+  const f = from || '1000-01-01'
+  const t = to || '9999-12-31'
+  const entries = await db.journalEntries
+    .where('date').between(f, t, false, true)
+    .filter(e => !e.posted)
+    .sortBy('date')
+  const rows = []
+  for (const e of entries) {
+    const lines = await db.journalLines.where('entryId').equals(e.id).toArray()
+    rows.push({
+      ...e,
+      lines,
+      debit: lines.reduce((s, l) => s + (Number(l.debit) || 0), 0),
+      credit: lines.reduce((s, l) => s + (Number(l.credit) || 0), 0),
+    })
+  }
+  return rows
+}
+
+/* ترحيل قيد معلق يدويًا من شاشة الترحيل */
+export async function postPendingEntry(entryId) {
+  const entry = await db.journalEntries.get(entryId)
+  if (!entry) throw new Error('القيد غير موجود')
+  if (entry.posted) throw new Error('القيد مُرحّل مسبقًا')
+  await assertPeriodOpen(entry.date)
+  const lines = await db.journalLines.where('entryId').equals(entryId).toArray()
+  if (lines.length === 0) throw new Error('القيد بلا سطور — لا يمكن ترحيله')
+  const debit = lines.reduce((s, l) => s + (Number(l.debit) || 0), 0)
+  const credit = lines.reduce((s, l) => s + (Number(l.credit) || 0), 0)
+  if (Math.abs(debit - credit) > 0.005) throw new Error('القيد غير متوازن (' + fmt(debit) + ' / ' + fmt(credit) + ') — لا يمكن ترحيله')
+  await db.journalEntries.update(entryId, { posted: true, postedAt: Date.now() })
+  await audit('entry_post', 'journal', entryId, 'ترحيل القيد المعلق #' + entryId + ' — ' + (entry.description || ''))
+  return true
+}
+
+/* حذف قيد معلق (غير مُرحّل) من شاشة الترحيل */
+export async function deletePendingEntry(entryId) {
+  const entry = await db.journalEntries.get(entryId)
+  if (!entry) throw new Error('القيد غير موجود')
+  if (entry.posted) throw new Error('لا يمكن حذف قيد مُرحّل — يُلغى من مصدره (فاتورة/سند)')
+  await assertPeriodOpen(entry.date)
+  await db.journalLines.where('entryId').equals(entryId).delete()
+  await db.journalEntries.delete(entryId)
+  await audit('entry_delete', 'journal', entryId, 'حذف القيد المعلق #' + entryId)
+  return true
 }
 
 /* ---------- قيد تحويل بين مخازن (لا أثر محاسبي على القيمة، حركة فقط) ---------- */
@@ -489,4 +618,4 @@ export async function recordTransfer({ fromStoreId, toStoreId, itemId, batchId, 
   ])
 }
 
-export default { fmt, accountBalance, trialBalance, generalLedger, incomeStatement, postJournalEntry, addBatch, itemStock, consumeStock, computeCOGS, sysAccounts, postSaleJournal, postPurchaseJournal, postCollectionJournal, postReturnJournal, postSupplierPaymentJournal, postManualJournal, postOpeningJournal, recordTransfer }
+export default { fmt, accountBalance, trialBalance, generalLedger, incomeStatement, postJournalEntry, addBatch, itemStock, consumeStock, computeCOGS, sysAccounts, sysAccountsList, postSaleJournal, postPurchaseJournal, postCollectionJournal, postReturnJournal, postSupplierPaymentJournal, postManualJournal, postOpeningJournal, recordTransfer, treasuryBalance, treasurySummary, trialBalanceAsOf, pendingJournalEntries, postPendingEntry, deletePendingEntry, isPeriodClosed }

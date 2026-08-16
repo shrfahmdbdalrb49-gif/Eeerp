@@ -5,7 +5,8 @@
    - 'server' : الخادم المركزي PostgreSQL + JWT
    يمكن التبديل لاحقًا عبر الإعدادات دون إعادة بناء.
    ============================================ */
-let STORAGE_MODE = import.meta.env.VITE_STORAGE_MODE || 'server'
+/* الافتراضي 'local': لا خادم تشغيلي حاليًا؛ وضع الخادم يُفعّل فقط بمتغير بيئة صريح */
+let STORAGE_MODE = import.meta.env.VITE_STORAGE_MODE || 'local'
 
 export function getStorageMode() {
   return STORAGE_MODE
