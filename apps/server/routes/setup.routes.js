@@ -48,7 +48,7 @@ router.post('/retry', async (req, res, next) => {
         await query(`UPDATE users SET password_hash = $1, active = true WHERE username = 'admin'`, [hash])
       }
       const users = await query(`SELECT username, role, active FROM users`)
-      const stats = await query(`SELECT (SELECT COUNT(*) FROM pg_tables WHERE schemaname='public') AS tables`)
+      const stats = await query(`SELECT COUNT(*) AS tables FROM pg_tables WHERE schemaname='public'`)
       res.json({ ok: true, schema_ok: ok, schema_fail: fail, errors, users: users.rows, tables: stats.rows[0].tables })
     } catch (ioErr) {
       res.status(500).json({ ok: false, error: 'فشل قراءة ملفات SQL: ' + ioErr.message })
