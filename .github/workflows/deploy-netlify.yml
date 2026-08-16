@@ -28,6 +28,11 @@ jobs:
       - name: Build Sharaf ERP (base path = /) into dist-cf-root
         run: ./build.sh
 
+      - name: Sanitize Netlify token (remove accidental newlines/spaces)
+        run: |
+          echo "NETLIFY_AUTH_TOKEN=$(printf '%s' '${{ secrets.NETLIFY_AUTH_TOKEN }}' | tr -d '\n\r ')" >> $GITHUB_ENV
+          echo "NETLIFY_SITE_ID=$(printf '%s' '${{ secrets.NETLIFY_SITE_ID }}' | tr -d '\n\r ')" >> $GITHUB_ENV
+
       - uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: ./dist-cf-root
@@ -39,6 +44,6 @@ jobs:
           enable-github-deployment: false
           overwrites-pull-request-comment: false
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ env.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ env.NETLIFY_SITE_ID }}
         timeout-minutes: 10
