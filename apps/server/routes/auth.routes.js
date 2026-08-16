@@ -29,3 +29,12 @@ router.post('/login', async (req, res, next) => {
 })
 
 export default router
+
+/* تشخيص آمن: هل مستخدم admin موجود ونشط؟ (لا يكشف كلمة المرور) */
+router.get('/admin-status', async (req, res, next) => {
+  try {
+    const user = await queryOne(`SELECT id, username, active, role, created_at FROM users WHERE username = 'admin'`)
+    if (!user) return res.json({ exists: false })
+    res.json({ exists: true, active: user.active, role: user.role, created_at: user.created_at })
+  } catch (err) { next(err) }
+})
