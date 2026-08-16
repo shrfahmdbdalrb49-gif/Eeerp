@@ -11,7 +11,15 @@ const pool = new pg.Pool({
   database: process.env.DB_NAME || 'sharaf_erp',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
-  ssl: process.env.DB_SSL === '1' || process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl: (() => {
+    // السحب: Railway وجميع الاستضافات السحابية تتطلب SSL
+    if (process.env.DB_SSL === '0' || process.env.DB_SSL === 'false') return false
+    if (process.env.DB_SSL === '1' || process.env.DB_SSL === 'true') return { rejectUnauthorized: false }
+    // تفعيل SSL تلقائيًا عند الاتصال بقاعدة بيانات سحابية
+    const host = process.env.PGHOST || ''
+    if (process.env.DATABASE_URL || (host && host !== 'localhost' && !host.startsWith('127.'))) return { rejectUnauthorized: false }
+    return false
+  })(),
   max: 10,
 })
 
