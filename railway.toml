@@ -3,4 +3,5 @@ builder = "NIXPACKS"
 nixpacksPlan.phases.setup.nixPkgs = ["nodejs-20_x"]
 
 [deploy]
-startCommand = "cd apps/server && npm install --omit=dev && node server.js"
+startCommand = "npm install --omit=dev && node server.js"
+rootDirectory = "apps/server"

@@ -51,7 +51,7 @@ app.use('/api/customers', customersRouter)
 app.use('/api/suppliers', suppliersRouter)
 
 /* ملفات ثابتة: البناء الأمامي نفسه (مجلد serve بمسارات جذرية) */
-const serveDir = join(__dirname, '..', '..', 'serve')
+const serveDir = join(__dirname, 'serve')
 app.use(express.static(serveDir))
 /* أي مسار آخر (SPA) يعيد الصفحة الرئيسية */
 app.use((req, res, next) => {
