@@ -10,7 +10,7 @@ import { auditLog } from '../middleware/audit.js'
 
 const router = express.Router()
 
-router.post('/auth/login', async (req, res, next) => {
+router.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body || {}
     if (!username || !password) return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبان' })
