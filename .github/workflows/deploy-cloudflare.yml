@@ -25,16 +25,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: apps/web/pnpm-lock.yaml
 
-      - name: Build Sharaf ERP for Cloudflare (base path = /)
-        working-directory: apps/web
-        run: |
-          pnpm install --frozen-lockfile --config.auto-install-peers=false || pnpm install --no-frozen-lockfile
-          pnpm build:cf
-
-      - name: Fix asset paths for Cloudflare root base
-        run: |
-          sed -i 's|/Eeerp/|/|g' dist-cf-root/index.html dist-cf-root/sw.js dist-cf-root/manifest.webmanifest 2>/dev/null || true
-          ls -la dist-cf-root && head -c 300 dist-cf-root/index.html
+      - name: Build Sharaf ERP for Cloudflare (base path = /) into dist-cf-root
+        run: ./build.sh
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
