@@ -41,10 +41,10 @@ export async function serverPostCollection({ customerId, amount, method, date, r
 }
 
 /* ---------- السداد للموردين ---------- */
-export async function serverPostSupplierPayment({ supplierId, amount, method, date, referenceNo, notes, operationType, accountKey }) {
+export async function serverPostSupplierPayment({ supplierId, amount, method, date, referenceNo, notes, operationType, accountKey, branchId, treasury, currency, exchangeRate, checkNo, checkDueDate, checkBank, costCenter, statement, recipient, lines, posted }) {
   return await apiFetch('/supplier-payments', {
     method: 'POST',
-    body: JSON.stringify({ supplierId: supplierId != null ? Number(supplierId) : null, amount: Number(amount), method: method || 'cash', paymentDate: date || today(), referenceNo: referenceNo || null, notes: notes || null, operationType: operationType || null, accountKey: accountKey || null }),
+    body: JSON.stringify({ supplierId: supplierId != null ? Number(supplierId) : null, amount: Number(amount), method: method || 'cash', paymentDate: date || today(), referenceNo: referenceNo || null, notes: notes || null, operationType: operationType || null, accountKey: accountKey || null, branchId: branchId || null, treasury: treasury || null, currency: currency || 'YER', exchangeRate: Number(exchangeRate ?? 1), checkNo: checkNo || null, checkDueDate: checkDueDate || null, checkBank: checkBank || null, costCenter: costCenter || null, statement: statement || null, recipient: recipient || null, lines: Array.isArray(lines) ? lines.map(l => ({ ...l, amount: Number(l.amount || 0) })) : null, posted: posted === true }),
   })
 }
 
