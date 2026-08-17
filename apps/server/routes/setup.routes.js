@@ -44,16 +44,22 @@ router.post('/retry', async (req, res) => {
       try { await pool.query(stmt) }
       catch (e) { errors.push(`seed: ${e.message}`) }
     }
-    // 3) ضمان admin (bcrypt عبر JS لا SQL)
-    const existing = await pool.query(`SELECT id FROM users WHERE username = $1`, ['admin'])
-    const hash = await bcrypt.hash('Admin@1234', 10)
-    if (existing.rowCount === 0) {
-      await pool.query(
-        `INSERT INTO users (username, full_name, password_hash, role, active) VALUES ($1, $2, $3, 'admin', true)`,
-        ['admin', 'مدير النظام', hash]
-      )
+    // 3) ضمان admin (bcrypt عبر JS لا SQL) — يُتخطى نهائيًا إذا وُجد حساب إداري عربي (شرف) حفاظًا على سياسة المستخدم
+    const sharafAdmin = await pool.query(`SELECT id FROM users WHERE username = 'شرف' AND role = 'admin' AND active = true`)
+    if (sharafAdmin.rowCount === 0) {
+      const existing = await pool.query(`SELECT id FROM users WHERE username = $1`, ['admin'])
+      const hash = await bcrypt.hash('Admin@1234', 10)
+      if (existing.rowCount === 0) {
+        await pool.query(
+          `INSERT INTO users (username, full_name, password_hash, role, active) VALUES ($1, $2, $3, 'admin', true)`,
+          ['admin', 'مدير النظام', hash]
+        )
+      } else {
+        await pool.query(`UPDATE users SET password_hash = $1, active = true WHERE username = 'admin'`, [hash])
+      }
     } else {
-      await pool.query(`UPDATE users SET password_hash = $1, active = true WHERE username = 'admin'`, [hash])
+      // إزالة حساب admin الافتراضي نهائيًا لأن المستخدم لا يريده
+      await pool.query(`DELETE FROM users WHERE username = 'admin'`).catch(() => {})
     }
     // 4) إصلاح رجعي: الأسطر الصفرية في القيود القديمة (idempotent)
     let retroCounts = []

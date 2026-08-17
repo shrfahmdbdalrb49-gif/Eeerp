@@ -58,7 +58,14 @@ export async function autoSetup(pool) {
       }
     }
     console.log(`✅ ${seedOk} أمر بيانات أولية (أدوار، حسابات، مستخدم admin) نجح، ${seedFail} فشل`)
-    console.log('🔐 بيانات الدخول: admin / Admin@1234 (يُفضَّل تغييرها)')
+    /* سياسة المستخدم: حساب إداري عربي (شرف) فقط — حذف admin الافتراضي نهائيًا */
+    const sharafCheck = await pool.query(`SELECT id FROM users WHERE username = 'شرف' AND role = 'admin' AND active = true`)
+    if (sharafCheck.rowCount > 0) {
+      await pool.query(`DELETE FROM users WHERE username = 'admin'`).catch(() => {})
+      console.log('🔐 حساب admin الافتراضي حُذف (الحساب الإداري: شرف)')
+    } else {
+      console.log('🔐 بيانات الدخول الافتراضية: admin / Admin@1234 (يُفضَّل تغييرها)')
+    }
 
     /* إصلاح رجعي: تصحيح الأسطر الصفرية في القيود القديمة — فقط الصفوف المعطوبة (idempotent) */
     try {
