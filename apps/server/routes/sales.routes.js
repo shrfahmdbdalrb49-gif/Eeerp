@@ -101,14 +101,14 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
       if (l.batch_id) {
         const avail = await conn.query(
           `SELECT COALESCE(SUM(quantity),0) - COALESCE(SUM(reserved_quantity),0) AS q
-           FROM stock_movements WHERE item_id = $1 AND batch_id = $2 AND store_id = $3`,
+           FROM stock_movements WHERE item_id = $1 AND batch_id = $2 AND (store_id IS NOT DISTINCT FROM $3)`,
           [l.item_id, l.batch_id, s.store_id],
         )
         if (Number(avail.rows[0].q) < qty) throw Object.assign(new Error(`مخزون غير كافٍ للصنف ${itemMap.get(l.item_id)?.name} (الدفعة المحددة)`), { status: 400 })
       } else {
         const avail = await conn.query(
           `SELECT COALESCE(SUM(quantity),0) - COALESCE(SUM(reserved_quantity),0) AS q
-           FROM stock_movements WHERE item_id = $1 AND store_id = $2`,
+           FROM stock_movements WHERE item_id = $1 AND (store_id IS NOT DISTINCT FROM $2)`,
           [l.item_id, s.store_id],
         )
         if (Number(avail.rows[0].q) < qty) throw Object.assign(new Error(`مخزون غير كافٍ للصنف ${itemMap.get(l.item_id)?.name}`), { status: 400 })
@@ -133,7 +133,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
         const avgRow = await conn.query(
           `SELECT COALESCE(SUM(m.quantity * m.unit_cost),0) / NULLIF(SUM(m.quantity),0) AS avg_cost
            FROM stock_movements m
-           WHERE m.item_id = $1 AND m.store_id = $2 AND m.movement_type = 'in' AND m.quantity > 0
+           WHERE m.item_id = $1 AND (m.store_id IS NOT DISTINCT FROM $2) AND m.movement_type = 'in' AND m.quantity > 0
              ${batchSel2 ? 'AND m.batch_id = $3' : ''}`.replace('$3', '$3'),
           batchSel2 ? [l.item_id, s.store_id, batchSel2] : [l.item_id, s.store_id],
         )
@@ -169,7 +169,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
       if (batchSel) {
         await conn.query(
           `UPDATE stock_movements SET reserved_quantity = reserved_quantity + $1::numeric
-           WHERE item_id = $2 AND batch_id = $3 AND store_id = $4`,
+           WHERE item_id = $2 AND batch_id = $3 AND (store_id IS NOT DISTINCT FROM $4)`,
           [remaining, l.item_id, batchSel, s.store_id],
         )
       }
@@ -177,7 +177,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
         /* لا نعدّل quantity في حركات in نهائيًا — ندخل حركة out سالبة لكل كمية مباعة (خصم واحد فقط) */
         const target = await conn.query(
           `SELECT id FROM stock_movements
-           WHERE item_id = $1 AND store_id = $2
+           WHERE item_id = $1 AND (store_id IS NOT DISTINCT FROM $2)
              AND movement_type = 'in' AND quantity - reserved_quantity > 0
              ${batchSel ? 'AND batch_id = ' + Number(batchSel) : ''}
            ORDER BY created_at ASC LIMIT 1`,

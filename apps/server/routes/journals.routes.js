@@ -20,7 +20,22 @@ router.get('/', requireAuth, requirePermission('journals.read'), async (req, res
       const rows = await conn.query(
         `SELECT * FROM journal_entries ORDER BY id DESC LIMIT 200`,
       )
-      res.json(rows.rows)
+      const ids = rows.rows.map(e => e.id)
+      let lines = []
+      if (ids.length) {
+        const lr = await conn.query(
+          `SELECT entry_id, COALESCE(SUM(debit),0)::float AS dr, COALESCE(SUM(credit),0)::float AS cr
+           FROM journal_lines WHERE entry_id = ANY($1::int[]) GROUP BY entry_id`,
+          [ids],
+        )
+        lines = lr.rows
+      }
+      const sums = new Map(lines.map(l => [l.entry_id, { dr: l.dr, cr: l.cr }]))
+      const out = rows.rows.map(e => {
+        const s = sums.get(e.id) || { dr: 0, cr: 0 }
+        return { ...e, total_debit: Number(s.dr.toFixed(2)), total_credit: Number(s.cr.toFixed(2)), balanced: Math.abs(s.dr - s.cr) <= 0.005 }
+      })
+      res.json(out)
     } finally { conn.release() }
   } catch (err) { next(err) }
 })
