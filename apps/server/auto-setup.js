@@ -14,6 +14,16 @@ const __dirname = dirname(__filename)
 export async function autoSetup(pool) {
   console.log('🔧 بدء التهيئة التلقائية لقاعدة البيانات...')
   try {
+    /* أولًا: migrations — إضافة الأعمدة الناقصة للجداول القديمة (لا تفشل أبدًا) */
+    try {
+      const mig = await readFile(join(__dirname, 'sql', 'migrations.sql'), 'utf8')
+      const migStatements = splitSQL(mig)
+      for (const stmt of migStatements) {
+        try { await pool.query(stmt) } catch (e) { /* تجاهل أخطاء الأعمدة الموجودة */ }
+      }
+      console.log(`🔧 تم تنفيذ ${migStatements.length} أمر ترقية (migrations) على الجداول القديمة`)
+    } catch (e) { console.error('⚠️ migrations skipped:', e.message) }
+
     const schema = await readFile(join(__dirname, 'sql', 'schema.sql'), 'utf8')
     // تنفيذ أوامر CREATE TABLE واحدة تلو الأخرى (pg.query لا يدعم pg_multiple_statements الافتراضي)
     const statements = splitSQL(schema)
