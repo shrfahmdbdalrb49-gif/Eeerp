@@ -214,18 +214,16 @@ async function loadData() {
         minStock: Number(it.min_stock || 0), prescription: !!it.prescription,
         active: it.active === true || it.active === 1 || it.active === 't' ? 1 : 0,
       }))
-      const batches = await apiFetch('/batches')
+      /* المخزون يُحسب من حركات المخزون الفعلية وليس من جدول الدُفعات اليدوي */
+      const stockRows = await apiFetch('/reports/item-movements')
       const g = {}
-      for (const b of (Array.isArray(batches) ? batches : [])) {
-        if (!b.quarantined && b.qty > 0) {
-          const x = g[b.item_id] || { total: 0, cost: 0 }
-          x.total += b.qty
-          x.cost += b.qty * (b.cost ?? b.cost_price ?? 0)
-          if (!x.nextExpiry || (b.expiry_date && b.expiry_date < x.nextExpiry)) x.nextExpiry = b.expiry_date
-          g[b.item_id] = x
+      for (const b of (stockRows?.rows || [])) {
+        const qt = Number(b.qty_net || 0)
+        if (qt !== 0) {
+          g[b.item_id] = { total: qt, avgCost: b.value_net && qt ? Number(b.value_net) / qt : 0, nextExpiry: b.next_expiry || null }
         }
       }
-      stockInfo.value = Object.fromEntries(Object.entries(g).map(([k, v]) => [Number(k), { total: v.total, avgCost: v.total ? v.cost / v.total : 0, nextExpiry: v.nextExpiry }]))
+      stockInfo.value = Object.fromEntries(Object.entries(g).map(([k, v]) => [Number(k), { total: v.total, avgCost: v.avgCost || 0, nextExpiry: v.nextExpiry }]))
       movements.value = new Set(Object.keys(g).map(Number))
       return
     } catch (e) { formError.value = 'فشل تحميل الأصناف من الخادم: ' + (e.message || e); return }

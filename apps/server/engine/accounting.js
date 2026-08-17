@@ -248,9 +248,9 @@ export async function itemMovements(conn, from, to, storeId) {
   const rows = await conn.query(`
     SELECT sm.item_id, i.name AS item_name, i.barcode, i.unit,
            COALESCE(SUM(CASE WHEN sm.movement_type='in' THEN sm.quantity ELSE 0 END),0)::numeric(18,3) AS qty_in,
-           COALESCE(SUM(CASE WHEN sm.movement_type='out' THEN sm.quantity ELSE 0 END),0)::numeric(18,3) AS qty_out,
+           COALESCE(SUM(CASE WHEN sm.movement_type='out' THEN ABS(sm.quantity) ELSE 0 END),0)::numeric(18,3) AS qty_out,
            COALESCE(SUM(sm.quantity),0)::numeric(18,3) AS qty_net,
-           COALESCE(SUM(sm.quantity * sm.unit_cost),0)::numeric(18,2) AS value_net
+           COALESCE(SUM(CASE WHEN sm.movement_type='in' THEN sm.quantity*sm.unit_cost ELSE -sm.quantity*sm.unit_cost END),0)::numeric(18,2) AS value_net
     FROM stock_movements sm
     JOIN items i ON i.id = sm.item_id
     ${where}

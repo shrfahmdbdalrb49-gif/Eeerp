@@ -94,9 +94,10 @@ router.delete('/:id', requireAuth, requirePermission('items.write'), async (req,
 router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (req, res, next) => {
   try {
     const rows = await query(
-      `SELECT b.id AS batch_id, b.batch_no, b.expiry_date,
+      `SELECT b.id AS batch_id, b.batch_no, b.expiry_date, b.cost_per_unit AS cost,
               COALESCE(SUM(sm.quantity),0) AS quantity,
-              COALESCE(SUM(sm.reserved_quantity),0) AS reserved
+              COALESCE(SUM(sm.reserved_quantity),0) AS reserved,
+              COALESCE(SUM(sm.quantity),0) - COALESCE(SUM(sm.reserved_quantity),0) AS qty_available
        FROM batches b
        LEFT JOIN stock_movements sm ON sm.batch_id = b.id
        WHERE b.item_id = $1
