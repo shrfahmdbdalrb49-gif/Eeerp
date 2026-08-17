@@ -10,6 +10,22 @@ JOIN purchases p          ON p.id = je.ref_id AND je.ref_kind = 'purchase'
 JOIN purchase_lines pl    ON pl.purchase_id = p.id
 WHERE jl.entry_id = je.id AND jl.debit = 0 AND jl.credit = 0;
 
+/* أولًا: تصحيح purchase_lines line_total الخاطئ في المشتريات القديمة (أنشئت قبل إصلاح الحساب) */
+UPDATE purchase_lines
+SET line_total = ROUND((quantity * COALESCE(unit_cost, 0))::numeric, 2)
+WHERE line_total = 0;
+
+/* تصحيح إجماليات المشتريات القديمة: total = مجموع الخطوط، paid = المدفوع */
+UPDATE purchases
+SET total_before_discount = t.ta,
+    total_amount = t.ta
+FROM (
+  SELECT purchase_id,
+         COALESCE(SUM(line_total), 0) AS ta
+  FROM purchase_lines GROUP BY purchase_id
+) t
+WHERE purchases.id = t.purchase_id;
+
 /* قيود الشراء: أسطر الصندوق (دفع مقدم) — سددت نقدي: debit = paid_amount */
 UPDATE journal_lines jl
 SET debit = CASE WHEN jl.debit = 0 THEN COALESCE(p.paid_amount,0) ELSE jl.debit END
