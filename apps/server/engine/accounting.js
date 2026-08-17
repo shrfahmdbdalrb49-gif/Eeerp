@@ -159,7 +159,7 @@ export async function accountBalance(conn, accountId, to) {
 
 /* ميزان المراجعة (كل الحسابات بأرصدة مراكمة) */
 export async function trialBalance(conn, to) {
-  const toQ = to ? `AND je.entry_date <= $1` : ''
+  const toQ = to ? ' AND je.entry_date <= $1' : ''
   const params = to ? [to] : []
   const sql = `
     SELECT ca.id AS account_id, ca.code, ca.number, ca.name, ca.type, ca.balance_direction,
@@ -167,7 +167,7 @@ export async function trialBalance(conn, to) {
            COALESCE(SUM(jl.credit),0)::numeric(18,2) AS credit
     FROM chart_of_accounts ca
     LEFT JOIN journal_lines jl ON jl.account_id = ca.id
-    LEFT JOIN journal_entries je ON je.id = jl.entry_id AND je.posted ${toQ ? ' AND ' + toQ.replace('AND je.', 'je.') : ''}
+    LEFT JOIN journal_entries je ON je.id = jl.entry_id AND je.posted ${toQ}
     GROUP BY ca.id
     ORDER BY ca.code
   `
