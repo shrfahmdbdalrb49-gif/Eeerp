@@ -55,8 +55,20 @@ router.post('/retry', async (req, res) => {
     } else {
       await pool.query(`UPDATE users SET password_hash = $1, active = true WHERE username = 'admin'`, [hash])
     }
+    // 4) إصلاح رجعي: الأسطر الصفرية في القيود القديمة (idempotent)
+    let retroCounts = []
+    try {
+      const retro = await readFile(join(dir, '..', 'sql', 'retro-je-fix.sql'), 'utf8')
+      const retroStmts = splitSQL(retro)
+      for (const stmt of retroStmts) {
+        try {
+          const r = await pool.query(stmt)
+          retroCounts.push({ stmt: stmt.trim().slice(0, 55).replace(/\n/g, ' '), rows: r.rowCount })
+        } catch (e) { errors.push(`retro-je: ${e.message}`) }
+      }
+    } catch (e) { errors.push(`retro-je: ${e.message}`) }
     const users = await pool.query(`SELECT username, role, active FROM users`)
-    res.json({ ok: true, schema_stmts: stmts.length, schema_ok: ok, errors, users: users.rows })
+    res.json({ ok: true, schema_stmts: stmts.length, schema_ok: ok, retro: retroCounts, errors, users: users.rows })
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err && err.message ? err.message : err) })
   }

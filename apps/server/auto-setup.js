@@ -59,6 +59,16 @@ export async function autoSetup(pool) {
     }
     console.log(`✅ ${seedOk} أمر بيانات أولية (أدوار، حسابات، مستخدم admin) نجح، ${seedFail} فشل`)
     console.log('🔐 بيانات الدخول: admin / Admin@1234 (يُفضَّل تغييرها)')
+
+    /* إصلاح رجعي: تصحيح الأسطر الصفرية في القيود القديمة — فقط الصفوف المعطوبة (idempotent) */
+    try {
+      const retro = await readFile(join(__dirname, 'sql', 'retro-je-fix.sql'), 'utf8')
+      const retroStatements = splitSQL(retro)
+      for (const stmt of retroStatements) {
+        const res = await pool.query(stmt)
+        console.log(`🔧 retro-je: ${res.rowCount ?? 0} صفوف صُححت: ${stmt.trim().slice(0, 60)}`)
+      }
+    } catch (e) { console.error('⚠️ retro-je-fix skipped:', e.message) }
     return true
   } catch (err) {
     console.error('⚠️ فشل التهيئة التلقائية كليًا:', err.message)
