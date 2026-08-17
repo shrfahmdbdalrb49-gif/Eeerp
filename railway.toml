@@ -3,7 +3,14 @@ builder = "RAILPACK"
 rootDirectory = "."
 watchPatterns = ["apps/server/**", "package.json"]
 
+[build.packages]
+nodejs = "22"
+
 [deploy]
 startCommand = "node apps/server/server.js"
+healthcheckPath = "/api/health"
+healthcheckIntervalSeconds = 15
+healthcheckTimeoutSeconds = 10
+healthcheckPort = 4000
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
