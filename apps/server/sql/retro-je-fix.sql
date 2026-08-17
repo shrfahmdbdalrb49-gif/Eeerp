@@ -29,7 +29,7 @@ SET total_before_discount = t.tbd,
     total_amount = t.ta
 FROM (
   SELECT invoice_id,
-         COALESCE(SUM(ROUND((quantity * (COALESCE(unit_price, 0) - COALESCE(discount_amount, 0)))::numeric), 2), 0) AS tbd,
+         COALESCE(SUM(ROUND((quantity * (COALESCE(unit_price, 0) - COALESCE(discount_amount, 0)))::numeric, 2)), 0) AS tbd,
          COALESCE(SUM(COALESCE(discount_amount, 0)), 0) AS td,
          COALESCE(SUM(COALESCE(tax_amount, 0)), 0) AS tt,
          COALESCE(SUM(line_total), 0) AS ta
