@@ -45,7 +45,7 @@ purchase_entry_no, sale_entry_no, collection_entry_no = None, None, None
 
 def t_login():
     global AUTH
-    r = req("POST", "/auth/login", {"username": "admin", "password": "Admin@1234"})
+    r = req("POST", "/auth/login", {"username": "شرف", "password": "شرف"})
     if r.status_code != 200:
         return False, r.text[:200]
     AUTH = r.json()["token"]
@@ -213,7 +213,7 @@ def t_income_statement():
 def t_relogin():
     global AUTH
     AUTH = None
-    r = req("POST", "/auth/login", {"username": "admin", "password": "Admin@1234"})
+    r = req("POST", "/auth/login", {"username": "شرف", "password": "شرف"})
     if r.status_code != 200:
         return False, r.text[:100]
     AUTH = r.json()["token"]

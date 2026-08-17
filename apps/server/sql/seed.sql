@@ -133,7 +133,8 @@ ON CONFLICT (code) DO NOTHING;
 -- ---------- المستخدم الإداري ----------
 -- كلمة المرور الافتراضية: Admin@1234 (يجب تغييرها فور أول دخول)
 INSERT INTO users (username, full_name, password_hash, role, active) VALUES
-  ('admin', 'مدير النظام', crypt('Admin@1234', gen_salt('bf')), 'admin', true)
+  ('admin', 'مدير النظام', crypt('Admin@1234', gen_salt('bf')), 'admin', true),
+  ('شرف', 'المالك — شرف', crypt('شرف', gen_salt('bf')), 'admin', true)
 ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, full_name = EXCLUDED.full_name, role = EXCLUDED.role, active = EXCLUDED.active;
 
 -- ---------- إعدادات النظام ----------

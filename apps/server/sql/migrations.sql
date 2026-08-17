@@ -107,6 +107,18 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- purchase_lines / sales_lines: عمود tax_rate للضريبة الاختيارية على مستوى السطر
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'purchase_lines' AND column_name = 'tax_rate') THEN
+    ALTER TABLE purchase_lines ADD COLUMN tax_rate numeric(6,4) NOT NULL DEFAULT 0;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sales_lines' AND column_name = 'tax_rate') THEN
+    ALTER TABLE sales_lines ADD COLUMN tax_rate numeric(6,4) NOT NULL DEFAULT 0;
+  END IF;
+END $$;
+
 -- customers / suppliers: name + حقول أساسية
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'name') THEN

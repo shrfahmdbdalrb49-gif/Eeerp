@@ -60,15 +60,32 @@ router.post('/', requireAuth, requirePermission('sales.create'), async (req, res
       )
       const sid = rows[0].id
       for (const l of f.lines || []) {
+        const qty = Number(l.quantity || 0)
+        const unitPrice = Number(l.unit_price || 0)
+        const discount = Number(l.discount_amount || 0)
+        const lineTotal = Math.round((qty * unitPrice - discount) * 100) / 100
+        const taxRate = Number(l.tax_rate || 0)
+        const taxAmount = Number(l.tax_amount || (l.taxable ? Math.round(lineTotal * taxRate * 100) / 100 : 0))
+        const finalTotal = Math.round((lineTotal + taxAmount) * 100) / 100
         await conn.query(
           `INSERT INTO sales_lines (invoice_id, item_id, batch_id, quantity, unit, unit_price,
            discount_amount, tax_amount, line_total, cost_at_sale)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-          [sid, Number(l.item_id), l.batch_id ? Number(l.batch_id) : null, Number(l.quantity || 0),
-           l.unit || 'حبة', Number(l.unit_price || 0), Number(l.discount_amount || 0),
-           Number(l.tax_amount || 0), Number(l.line_total || 0), Number(l.cost_at_sale || 0)],
+          [sid, Number(l.item_id), l.batch_id ? Number(l.batch_id) : null, qty,
+           l.unit || 'حبة', unitPrice, discount,
+           taxAmount, finalTotal, Number(l.cost_at_sale || 0)],
         )
       }
+      /* إعادة حساب رؤوس الفاتورة من الأسطر */
+      await conn.query(
+        `UPDATE sales_invoices SET
+           total_before_discount = (SELECT COALESCE(SUM(quantity*unit_price),0) FROM sales_lines WHERE invoice_id = $1),
+           total_discount = (SELECT COALESCE(SUM(discount_amount),0) FROM sales_lines WHERE invoice_id = $1),
+           total_tax = (SELECT COALESCE(SUM(tax_amount),0) FROM sales_lines WHERE invoice_id = $1),
+           total_amount = (SELECT COALESCE(SUM(line_total),0) FROM sales_lines WHERE invoice_id = $1)
+         WHERE id = $1`,
+        [sid],
+      )
       const full = await conn.query(
         `SELECT s.*, c.name AS customer_name,
                 (SELECT json_agg(sl) FROM (SELECT * FROM sales_lines WHERE invoice_id = s.id) sl) AS lines
@@ -90,6 +107,22 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
     const s = head.rows[0]
     if (!s) throw Object.assign(new Error('الفاتورة غير موجودة'), { status: 404 })
     if (s.status !== 'draft') throw Object.assign(new Error('لا يمكن ترحيل فاتورة بحالة: ' + s.status), { status: 400 })
+    /* إصلاح وقائي: أي سطر بلا إجمالي يُحسب الآن تلقائيًا */
+    await conn.query(
+      `UPDATE sales_lines SET line_total = ROUND(quantity * unit_price - discount_amount, 2),
+                             tax_amount = ROUND((quantity * unit_price - discount_amount) * COALESCE(tax_rate,0), 2)
+       WHERE invoice_id = $1 AND COALESCE(line_total,0) <= 0 AND quantity > 0`,
+      [id],
+    )
+    await conn.query(
+      `UPDATE sales_invoices SET
+           total_before_discount = (SELECT COALESCE(SUM(quantity*unit_price),0) FROM sales_lines WHERE invoice_id = $1),
+           total_discount = (SELECT COALESCE(SUM(discount_amount),0) FROM sales_lines WHERE invoice_id = $1),
+           total_tax = (SELECT COALESCE(SUM(tax_amount),0) FROM sales_lines WHERE invoice_id = $1),
+           total_amount = (SELECT COALESCE(SUM(line_total),0) FROM sales_lines WHERE invoice_id = $1)
+       WHERE id = $1`,
+      [id],
+    )
     const lines = await conn.query('SELECT * FROM sales_lines WHERE invoice_id = $1', [id])
     const items = await conn.query(`SELECT id, name, sale_price, inventory_account_id, cogs_account_id
       FROM items WHERE id = ANY($1::int[])`, [lines.rows.map(l => l.item_id)])

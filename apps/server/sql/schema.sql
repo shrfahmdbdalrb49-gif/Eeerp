@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS purchase_lines (
   bonus_quantity numeric(18,2) DEFAULT 0,
   unit_cost numeric(18,2) NOT NULL,
   total_discount numeric(18,2) DEFAULT 0,
+  tax_rate numeric(6,4) NOT NULL DEFAULT 0,
   tax_amount numeric(18,2) DEFAULT 0,
   line_total numeric(18,2) NOT NULL
 );
@@ -215,6 +216,7 @@ CREATE TABLE IF NOT EXISTS sales_lines (
   unit text,
   unit_price numeric(18,2) NOT NULL,
   discount_amount numeric(18,2) DEFAULT 0,
+  tax_rate numeric(6,4) NOT NULL DEFAULT 0,
   tax_amount numeric(18,2) DEFAULT 0,
   line_total numeric(18,2) NOT NULL,
   cost_at_sale numeric(18,2) DEFAULT 0   -- التكلفة لحظة البيع لحساب الربح

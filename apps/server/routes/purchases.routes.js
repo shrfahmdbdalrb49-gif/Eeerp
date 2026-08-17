@@ -61,15 +61,32 @@ router.post('/', requireAuth, requirePermission('purchases.create'), async (req,
       const pid = rows[0].id
       const lines = f.lines || []
       for (const l of lines) {
+        const qty = Number(l.quantity || 0)
+        const unitCost = Number(l.unit_cost || 0)
+        const discount = Number(l.total_discount || 0)
+        const lineTotal = Math.round((qty * unitCost - discount) * 100) / 100
+        const taxRate = Number(l.tax_rate || 0)
+        const taxAmount = Number(l.tax_amount || (l.taxable ? Math.round(lineTotal * taxRate * 100) / 100 : 0))
+        const finalTotal = Math.round((lineTotal + taxAmount) * 100) / 100
         await conn.query(
           `INSERT INTO purchase_lines (purchase_id, item_id, batch_id, quantity, bonus_quantity,
            unit_cost, total_discount, tax_amount, line_total)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-          [pid, Number(l.item_id), l.batch_id ? Number(l.batch_id) : null, Number(l.quantity || 0),
-           Number(l.bonus_quantity || 0), Number(l.unit_cost || 0), Number(l.total_discount || 0),
-           Number(l.tax_amount || 0), Number(l.line_total || 0)],
+          [pid, Number(l.item_id), l.batch_id ? Number(l.batch_id) : null, qty,
+           Number(l.bonus_quantity || 0), unitCost, discount,
+           taxAmount, finalTotal],
         )
       }
+      /* إعادة حساب رؤوس الفاتورة من الأسطر */
+      await conn.query(
+        `UPDATE purchases SET
+           total_before_discount = (SELECT COALESCE(SUM(quantity*unit_cost),0) FROM purchase_lines WHERE purchase_id = $1),
+           total_discount = (SELECT COALESCE(SUM(total_discount),0) FROM purchase_lines WHERE purchase_id = $1),
+           total_tax = (SELECT COALESCE(SUM(tax_amount),0) FROM purchase_lines WHERE purchase_id = $1),
+           total_amount = (SELECT COALESCE(SUM(line_total),0) FROM purchase_lines WHERE purchase_id = $1)
+         WHERE id = $1`,
+        [pid],
+      )
       const full = await conn.query(
         `SELECT p.*, s.name AS supplier_name,
                 (SELECT json_agg(pl) FROM (SELECT * FROM purchase_lines WHERE purchase_id = p.id) pl) AS lines
