@@ -14,7 +14,7 @@ router.get('/', requireAuth, requirePermission('audit.read'), async (req, res, n
     try {
       const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000)
       const rows = await conn.query(
-        `SELECT al.id, al.action, al.entity_type, al.entity_id, al.details, al.created_at,
+        `SELECT al.id, al.action, al.ref_kind AS entity_type, al.ref_id AS entity_id, al.details, al.created_at,
                 u.username, u.full_name
          FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id
          ORDER BY al.id DESC LIMIT $1`,

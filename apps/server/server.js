@@ -4,6 +4,7 @@
    ============================================ */
 import express from 'express'
 import { getPool } from './config/db.js'
+import { requireAuth, requirePermission } from './middleware/auth.js'
 import { autoSetup } from './auto-setup.js'
 import cors from 'cors'
 import { fileURLToPath } from 'url'
@@ -54,6 +55,48 @@ app.use('/api/stores', storesRouter)
 app.use('/api/cash-boxes', cashBoxesRouter)
 app.use('/api/customers', customersRouter)
 app.use('/api/suppliers', suppliersRouter)
+
+/* الدفعات: GET يرجع قائمة الدفعات مع المتاح حاليًا من حركات المخزون */
+app.get('/api/batches', requireAuth, requirePermission('items.read'), async (req, res, next) => {
+  try {
+    const conn = await getPool().connect()
+    try {
+      const { rows } = await conn.query(`
+        SELECT b.*, i.name AS item_name,
+          COALESCE((SELECT SUM(m.quantity) FROM stock_movements m WHERE m.batch_id = b.id AND m.movement_type = 'in'), 0)
+            - COALESCE((SELECT SUM(m.quantity) FROM stock_movements m WHERE m.batch_id = b.id AND m.movement_type = 'out'), 0)
+            AS qty,
+          COALESCE((SELECT json_agg(m) FROM stock_movements m WHERE m.batch_id = b.id), '[]'::json) AS movements
+        FROM batches b JOIN items i ON i.id = b.item_id ORDER BY b.id DESC LIMIT 500`)
+      res.json(rows)
+    } finally { conn.release() }
+  } catch (err) { next(err) }
+})
+
+/* نقاط إضافية تطلبها الواجهة (بنود الجداول + مرجعات المبيعات + التحويلات + الوصفات) */
+const readTable = (path, table, perm, sortCol) => {
+  app.get('/api/' + path, requireAuth, requirePermission(perm + '.read'), async (req, res, next) => {
+    try {
+      const rows = await (await getPool().connect()).query(`SELECT * FROM ${table} ORDER BY ${sortCol} DESC LIMIT 5000`)
+      res.json(rows.rows)
+    } catch (err) { next(err) }
+  })
+}
+readTable('sales/return-lines', 'sales_return_lines', 'sales', 'id')
+readTable('purchases/lines', 'purchase_lines', 'purchases', 'id')
+readTable('journals/lines', 'journal_lines', 'journals', 'id')
+readTable('transfers', 'transfers', 'transfers', 'id')
+readTable('transfer-lines', 'transfer_lines', 'transfers', 'id')
+readTable('doctors', 'doctors', 'prescriptions', 'id')
+readTable('prescriptions', 'prescriptions', 'prescriptions', 'id')
+readTable('prescription-lines', 'prescription_lines', 'prescriptions', 'id')
+readTable('held-invoices', 'held_invoices', 'sales', 'id')
+app.get('/api/sales/returns', requireAuth, requirePermission('sales.read'), async (req, res, next) => {
+  try {
+    const rows = await (await getPool().connect()).query(`SELECT * FROM sales_returns ORDER BY id DESC LIMIT 500`)
+    res.json(rows.rows)
+  } catch (err) { next(err) }
+})
 
 /* ملفات ثابتة: البناء الأمامي نفسه (مجلد serve بمسارات جذرية) */
 const serveDir = join(__dirname, 'serve')

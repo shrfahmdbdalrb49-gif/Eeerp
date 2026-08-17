@@ -41,6 +41,7 @@ router.get('/', requireAuth, requirePermission('journals.read'), async (req, res
 })
 
 router.get('/:id', requireAuth, requirePermission('journals.read'), async (req, res, next) => {
+  if (isNaN(Number(req.params.id))) return next()
   try {
     const conn = await getPool().connect()
     try {

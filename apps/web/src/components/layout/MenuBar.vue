@@ -3,28 +3,32 @@
   <nav class="menu-bar" role="menubar" aria-label="القائمة الرئيسية">
     <template v-for="section in allSections" :key="section.key">
       <div
-        class="menu-item"
-        role="menuitem"
-        tabindex="0"
-        :class="{ open: openMenu === section.key }"
-        @click="toggleMenu(section.key)"
+        class="menu-wrapper"
         @mouseenter="onHover(section.key)"
       >
-        <span class="menu-label">{{ section.title }}</span>
-        <svg class="menu-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </div>
-
-      <!-- القائمة المنسدلة -->
-      <transition name="dropdown">
         <div
-          v-if="openMenu === section.key"
-          class="dropdown-panel"
-          role="menu"
-          @click.stop
-          @mouseleave="keepOpen = false"
+          class="menu-item"
+          role="menuitem"
+          tabindex="0"
+          :class="{ open: openMenu === section.key }"
+          @click="toggleMenu(section.key)"
+          @keydown.enter.space.prevent="toggleMenu(section.key)"
         >
+          <span class="menu-label">{{ section.title }}</span>
+          <svg class="menu-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+
+        <!-- القائمة المنسدلة -->
+        <transition name="dropdown">
+          <div
+            v-if="openMenu === section.key"
+            class="dropdown-panel"
+            role="menu"
+            @click.stop
+            @mouseleave="keepOpen = false"
+          >
           <div class="dropdown-scroll">
             <template v-for="group in section.groups" :key="group.title">
               <div v-if="group.title" class="dropdown-group-title">{{ group.title }}</div>
@@ -70,7 +74,8 @@
             </template>
           </div>
         </div>
-      </transition>
+        </transition>
+      </div>
     </template>
   </nav>
 </template>
@@ -93,6 +98,340 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['select'])
+
+// ===== الأقسام الـ14 — نفس بنية Sidebar بالضبط (لا تحذف أي وظيفة) =====
+const allSections = [
+  {
+    key: 'sec-dashboard',
+    menuKey: 'dashboard',
+    title: 'النظام',
+    defaultPage: 'dashboard',
+    groups: [
+      {
+        title: 'نظرة عامة',
+        children: [
+          { page: 'dashboard', label: 'لوحة التحكم' },
+          { page: 'notifications', label: 'مركز التنبيهات' },
+          { page: 'stats', label: 'الإحصائيات' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-masterdata',
+    menuKey: 'masterdata',
+    title: 'البيانات الأساسية',
+    defaultPage: 'items',
+    groups: [
+      {
+        title: 'الأطراف',
+        children: [
+          { page: 'customers', label: 'العملاء (المرضى)' },
+          { page: 'suppliers', label: 'الموردون (شركات الأدوية)' },
+          { page: 'doctors', label: 'الأطباء وجهات الوصف' },
+        ],
+      },
+      {
+        title: 'الأصناف والوحدات',
+        children: [
+          { page: 'items', label: 'الأصناف (الأدوية والمستلزمات)' },
+          { page: 'therapeutic-groups', label: 'المجموعات العلاجية' },
+          { page: 'units', label: 'الوحدات' },
+          { page: 'price-lists', label: 'قوائم أسعار البيع' },
+        ],
+      },
+      {
+        title: 'إعدادات البيانات',
+        children: [
+          { page: 'branches', label: 'الفروع' },
+          { page: 'currencies', label: 'العملات' },
+          { page: 'taxes', label: 'الضرائب' },
+          { page: 'fiscal-years', label: 'السنوات المالية' },
+          { page: 'payment-methods', label: 'طرق الدفع' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-sales',
+    menuKey: 'sales',
+    title: 'المبيعات',
+    defaultPage: 'pos',
+    groups: [
+      {
+        title: 'عمليات البيع',
+        children: [
+          { page: 'pos', label: 'نقطة البيع POS' },
+          { page: 'invoices', label: 'فواتير المبيعات' },
+          { page: 'prescriptions', label: 'الوصفات الطبية' },
+          { page: 'returns', label: 'مرتجعات المبيعات' },
+          { page: 'discounts', label: 'الخصومات والعروض' },
+        ],
+      },
+      {
+        title: 'الذمم والتحصيل',
+        children: [
+          { page: 'collections', label: 'التحصيل' },
+          { page: 'aging-customers', label: 'أعمار ديون العملاء' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-purchases',
+    menuKey: 'purchases',
+    title: 'المشتريات',
+    defaultPage: 'purchase-invoices',
+    groups: [
+      {
+        title: 'عمليات الشراء',
+        children: [
+          { page: 'purchase-requests', label: 'طلبات الشراء' },
+          { page: 'purchase-orders', label: 'أوامر الشراء' },
+          { page: 'purchase-invoices', label: 'فواتير المشتريات' },
+          { page: 'receiving', label: 'استلام الشحنات' },
+          { page: 'purchase-returns', label: 'مرتجعات المشتريات' },
+        ],
+      },
+      {
+        title: 'السداد',
+        children: [{ page: 'supplier-payments', label: 'السداد للموردين' }],
+      },
+    ],
+  },
+  {
+    key: 'sec-inventory',
+    menuKey: 'inventory',
+    title: 'المخزون',
+    defaultPage: 'items',
+    groups: [
+      {
+        title: 'الأرصدة والحركة',
+        children: [
+          { page: 'warehouses', label: 'المخازن والفروع' },
+          { page: 'receiving-stock', label: 'التوريد' },
+          { page: 'dispensing', label: 'الصرف' },
+          { page: 'transfers', label: 'التحويل بين الفروع' },
+          { page: 'stocktake', label: 'الجرد' },
+          { page: 'stock-movement', label: 'حركة الأصناف والتشغيلات' },
+        ],
+      },
+      {
+        title: 'الصلاحية والتشغيلات',
+        children: [{ page: 'expiry', label: 'مراقبة الصلاحية' }],
+      },
+    ],
+  },
+  {
+    key: 'sec-insurance',
+    menuKey: 'insurance',
+    title: 'التأمين الصحي',
+    defaultPage: 'insurance-claims',
+    groups: [
+      {
+        title: 'التأمين',
+        children: [
+          { page: 'insurance-companies', label: 'شركات التأمين' },
+          { page: 'insurance-cards', label: 'بطاقات التأمين' },
+          { page: 'approvals', label: 'الموافقات' },
+          { page: 'insurance-claims', label: 'المطالبات (Claims)' },
+          { page: 'rejected-claims', label: 'المطالبات المرفوضة' },
+          { page: 'settlements', label: 'التسويات' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-treasury',
+    menuKey: 'treasury',
+    title: 'الصندوق والبنوك',
+    defaultPage: 'receipt-voucher',
+    groups: [
+      {
+        title: 'السندات',
+        children: [
+          { page: 'receipt-voucher', label: 'سند قبض' },
+          { page: 'payment-voucher', label: 'سند صرف' },
+        ],
+      },
+      {
+        title: 'الصناديق والبنوك',
+        children: [
+          { page: 'cash-boxes', label: 'الصناديق' },
+          { page: 'banks', label: 'البنوك' },
+          { page: 'financial-transfers', label: 'التحويلات المالية' },
+          { page: 'cheques', label: 'الشيكات' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-accounting',
+    menuKey: 'accounting',
+    title: 'الحسابات',
+    defaultPage: 'accounts',
+    groups: [
+      {
+        title: 'القيود والحسابات',
+        children: [
+          { page: 'accounts', label: 'دليل الحسابات' },
+          { page: 'journal', label: 'القيود اليومية' },
+          { page: 'opening-entries', label: 'القيود الافتتاحية' },
+          { page: 'posting', label: 'الترحيل المحاسبي' },
+          { page: 'period-close', label: 'إقفال الفترات' },
+          { page: 'bank-reconciliation', label: 'التسويات البنكية' },
+        ],
+      },
+      {
+        title: 'الذمم وأعمار الديون',
+        children: [
+          { page: 'aging-suppliers', label: 'أعمار ديون الموردين' },
+          { page: 'bad-debt-provision', label: 'مخصص الديون المشكوك فيها' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-assets',
+    menuKey: 'assets',
+    title: 'الأصول الثابتة',
+    defaultPage: 'fixed-assets',
+    groups: [
+      {
+        title: 'الأصول',
+        children: [
+          { page: 'fixed-assets', label: 'دليل الأصول' },
+          { page: 'asset-depreciation', label: 'الإهلاك' },
+          { page: 'asset-disposal', label: 'بيع واستبعاد الأصول' },
+          { page: 'asset-inventory', label: 'جرد الأصول' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-profit',
+    menuKey: 'profit',
+    title: 'الربحية والتكاليف',
+    defaultPage: 'item-cost',
+    groups: [
+      {
+        title: 'التكلفة والربحية',
+        children: [
+          { page: 'item-cost', label: 'تكلفة الأصناف' },
+          { page: 'avg-cost', label: 'متوسط التكلفة' },
+          { page: 'profit-margin', label: 'هامش الربح' },
+          { page: 'drug-profit', label: 'تحليل ربحية الأدوية' },
+          { page: 'branch-profit', label: 'تحليل ربحية الفروع' },
+          { page: 'pricing-policy', label: 'سياسات التسعير' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-hr',
+    menuKey: 'hr',
+    title: 'الموارد البشرية والرواتب',
+    defaultPage: 'employees',
+    groups: [
+      {
+        title: 'الموظفون والرواتب',
+        children: [
+          { page: 'employees', label: 'الموظفون والورديات' },
+          { page: 'payroll', label: 'مسيرات الرواتب' },
+          { page: 'hr-attendance', label: 'الحضور والانصراف' },
+          { page: 'hr-loans', label: 'السلف والخصومات' },
+          { page: 'hr-end-service', label: 'نهاية الخدمة' },
+          { page: 'hr-reports', label: 'تقارير الموارد البشرية' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-reports',
+    menuKey: 'reports',
+    title: 'التقارير',
+    defaultPage: 'reports-sales',
+    groups: [
+      {
+        title: 'تقارير المبيعات',
+        children: [
+          { page: 'rpt-sales-item', label: 'حسب الصنف' },
+          { page: 'rpt-sales-doctor', label: 'حسب الطبيب' },
+          { page: 'rpt-sales-insurance', label: 'حسب التأمين' },
+          { page: 'reports-purchases', label: 'تقارير المشتريات' },
+        ],
+      },
+      {
+        title: 'تقارير المخزون',
+        children: [
+          { page: 'rpt-expiry', label: 'الصلاحية' },
+          { page: 'rpt-turnover', label: 'دوران المخزون' },
+          { page: 'rpt-movement', label: 'حركة الأصناف' },
+        ],
+      },
+      {
+        title: 'التقارير المالية',
+        children: [
+          { page: 'trial-balance', label: 'ميزان المراجعة' },
+          { page: 'general-ledger', label: 'الأستاذ العام والمساعد' },
+          { page: 'income-statement', label: 'قائمة الدخل' },
+          { page: 'balance-sheet', label: 'الميزانية العمومية' },
+        ],
+      },
+      {
+        title: 'تقارير أخرى',
+        children: [
+          { page: 'reports-profit', label: 'تقارير الربحية' },
+          { page: 'tax-reports', label: 'التقارير الضريبية' },
+          { page: 'custom-reports', label: 'التقارير المخصصة' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-admin',
+    menuKey: 'admin',
+    title: 'الإدارة',
+    defaultPage: 'users',
+    groups: [
+      {
+        title: 'المستخدمون والصلاحيات',
+        children: [
+          { page: 'users', label: 'المستخدمون والصلاحيات (RBAC)' },
+          { page: 'settings', label: 'إعدادات النظام' },
+        ],
+      },
+      {
+        title: 'التشغيل والمراقبة',
+        children: [
+          { page: 'audit', label: 'سجل العمليات (Audit Log)' },
+          { page: 'backup', label: 'النسخ الاحتياطي' },
+          { page: 'branches', label: 'إدارة الفروع' },
+          { page: 'notification-settings', label: 'إعدادات الإشعارات' },
+          { page: 'system-monitor', label: 'مراقبة النظام' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'sec-help',
+    menuKey: 'help',
+    title: 'المساعدة',
+    defaultPage: 'user-guide',
+    groups: [
+      {
+        title: 'المساعدة',
+        children: [
+          { page: 'user-guide', label: 'دليل المستخدم' },
+          { page: 'shortcuts', label: 'اختصارات لوحة المفاتيح' },
+          { page: 'updates', label: 'التحديثات' },
+          { page: 'support', label: 'الدعم الفني' },
+          { page: 'about', label: 'حول النظام' },
+        ],
+      },
+    ],
+  },
+]
 
 // ===== القائمة المنسدلة =====
 const openMenu = ref(null)
@@ -121,8 +460,9 @@ function pick(sectionKey, page) {
   emit('select', page)
 }
 
-/** إغلاق القائمة المنسدلة عند النقر خارجها */
-function onDocClick() {
+/** إغلاق القائمة المنسدلة عند النقر خارجها (لا نُغلق إذا كان النقر داخل الشريط نفسه) */
+function onDocClick(e) {
+  if (e && e.target && e.target.closest('.menu-bar')) return
   if (!keepOpen.value) openMenu.value = null
   keepOpen.value = false
 }
@@ -200,10 +540,14 @@ onUnmounted(() => {
 }
 
 /* ===== القائمة المنسدلة ===== */
+.menu-wrapper {
+  position: relative;
+}
+
 .dropdown-panel {
   position: absolute;
-  top: 44px;
-  right: var(--panel-right, auto);
+  top: 100%;
+  left: 0;
   min-width: 240px;
   max-width: 300px;
   max-height: calc(100vh - 60px);

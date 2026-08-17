@@ -44,7 +44,14 @@ export async function trialBalance() {
   /* في وضع الخادم المركزي: الحساب من الخادم */
   if (isServer()) {
     const data = await apiFetch('/reports/trial-balance')
-    if (data && Array.isArray(data.rows)) return data
+    if (data && Array.isArray(data.accounts)) {
+      return {
+        rows: data.accounts,
+        totalDebit: Number(data.total_debit || 0),
+        totalCredit: Number(data.total_credit || 0),
+        balanced: Math.abs(Number(data.total_debit || 0) - Number(data.total_credit || 0)) < 0.01,
+      }
+    }
     return data
   }
   const accounts = await activeAccounts()
@@ -68,6 +75,7 @@ export async function trialBalance() {
 export async function generalLedger(accountId, from, to) {
   if (isServer()) {
     const data = await apiFetch('/reports/general-ledger/' + accountId + (from || to ? '?' + new URLSearchParams({ from: from || '', to: to || '' }).toString() : ''))
+    if (data && Array.isArray(data.movements)) return data.movements
     return data && Array.isArray(data) ? data : []
   }
   const lines = await db.journalLines

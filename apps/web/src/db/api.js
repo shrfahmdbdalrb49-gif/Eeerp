@@ -45,8 +45,9 @@ export async function apiFetch(path, options = {}) {
   const res = await fetch(apiBase() + path, { ...options, headers })
   const text = await res.text()
   let data = null
-  try { data = text ? JSON.parse(text) : null } catch { data = { raw: text } }
-  if (!res.ok) {
+  let rawText = false
+  try { data = text ? JSON.parse(text) : null } catch { data = null; rawText = true }
+  if (!res.ok || rawText) {
     if (fallback !== undefined) return typeof fallback === 'function' ? fallback() : fallback
     const msg = (data && (data.error || data.message)) || 'خطأ في الاتصال بالخادم'
     const err = new Error(msg)

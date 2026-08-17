@@ -28,6 +28,7 @@ router.get('/', requireAuth, requirePermission('purchases.read'), async (req, re
 })
 
 router.get('/:id', requireAuth, requirePermission('purchases.read'), async (req, res, next) => {
+  if (isNaN(Number(req.params.id))) return next()
   try {
     const conn = await getPool().connect()
     try {

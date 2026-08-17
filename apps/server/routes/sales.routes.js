@@ -17,6 +17,13 @@ import { auditLog } from '../middleware/audit.js'
 
 const router = express.Router()
 
+router.get('/lines', requireAuth, requirePermission('sales.read'), async (req, res, next) => {
+  try {
+    const rows = await (await getPool().connect()).query('SELECT * FROM sales_lines ORDER BY invoice_id DESC, id')
+    res.json(rows.rows)
+  } catch (err) { next(err) }
+})
+
 router.get('/', requireAuth, requirePermission('sales.read'), async (req, res, next) => {
   try {
     const rows = await (await getPool().connect()).query(
@@ -29,6 +36,7 @@ router.get('/', requireAuth, requirePermission('sales.read'), async (req, res, n
 })
 
 router.get('/:id', requireAuth, requirePermission('sales.read'), async (req, res, next) => {
+  if (isNaN(Number(req.params.id))) return next()
   try {
     const conn = await getPool().connect()
     try {

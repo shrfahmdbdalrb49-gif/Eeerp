@@ -742,8 +742,8 @@ async function loadData() {
   if (isServer()) {
     try {
       const { apiFetch } = await import('../../db/api.js')
-      const raw = await apiFetch('/sales')
-      const users = await apiFetch('/users')
+      const raw = await apiFetch('/sales', { fallback: [] })
+      const users = await apiFetch('/users', { fallback: [] })
       const usersMap = Object.fromEntries((Array.isArray(users) ? users : []).map(u => [u.id, u.full_name || u.fullName]))
       invoices.value = (Array.isArray(raw) ? raw : []).map(inv => ({
         ...inv,
@@ -754,17 +754,17 @@ async function loadData() {
         customerName: inv.customer_name || null,
         createdByName: usersMap[inv.created_by || inv.createdBy] || '—',
       }))
-      const lines = await apiFetch('/sales-lines', { fallback: [] })
+      const lines = await apiFetch('/sales/lines', { fallback: [] })
       viewedLinesMap.value = {}
       for (const inv of invoices.value) {
         inv.linesCount = (Array.isArray(lines) ? lines : []).filter(l => l.invoice_id === inv.id).length
         viewedLinesMap.value[inv.id] = (Array.isArray(lines) ? lines : []).filter(l => l.invoice_id === inv.id)
       }
-      customers.value = (await apiFetch('/customers')).filter(c => c.status !== 'inactive')
+      customers.value = (await apiFetch('/customers', { fallback: [] })).filter(c => c.status !== 'inactive')
       for (const inv of invoices.value) {
         if (inv.customer_id) inv.customerName = customers.value.find(c => c.id === inv.customer_id)?.name || inv.customerName
       }
-      const b = await apiFetch('/batches')
+      const b = await apiFetch('/batches', { fallback: [] })
       const stockMap = {}, batchesMap = {}
       for (const x of (Array.isArray(b) ? b : [])) {
         if (!x.quarantined && x.qty > 0) {
@@ -772,7 +772,7 @@ async function loadData() {
           ;(batchesMap[x.item_id] = batchesMap[x.item_id] || []).push(x)
         }
       }
-      const serverItems = (await apiFetch('/items')).filter(it => it.status !== 'inactive')
+      const serverItems = (await apiFetch('/items', { fallback: [] })).filter(it => it.status !== 'inactive')
       items.value = serverItems.map(it => ({
         ...it, _stock: stockMap[it.id] || 0,
         _batches: (batchesMap[it.id] || []).sort((a, bb) => (a.exp_date || a.expDate || '9999') < (bb.exp_date || bb.expDate || '9999') ? -1 : 1),
