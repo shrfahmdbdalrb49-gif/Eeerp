@@ -20,7 +20,7 @@ router.post('/login', async (req, res, next) => {
     const ok = await bcrypt.compare(String(password), user.password_hash)
     if (!ok) return res.status(401).json({ error: 'خطأ في اسم المستخدم أو كلمة المرور' })
     const token = signToken(user)
-    await auditLog(req, 'login', 'user', user.id)
+    auditLog(req, 'login', 'user', user.id).catch(() => {}) /* fire-and-forget */
     res.json({
       token,
       user: { id: user.id, username: user.username, fullName: user.full_name, role: user.role },
