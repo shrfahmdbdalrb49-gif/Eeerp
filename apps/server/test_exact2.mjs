@@ -1,0 +1,10 @@
+import pg from 'pg'
+const pool = new pg.Pool({ host:'localhost', port:5432, database:'sharaf_test', user:'postgres', password:'postgres' })
+const conn = await pool.connect()
+const r = await conn.query(`INSERT INTO journal_entries (entry_no, entry_date, description, ref_kind, ref_id, posted, locked, created_by) VALUES ($1,$2,$3,$4,$5,$6,false,$7) RETURNING id`, ['JE-EX2','2026-08-17','t','purchase',1,true,1])
+console.log('typeof r=', typeof r, 'Array.isArray(r)=', Array.isArray(r), 'keys=', Object.keys(r))
+console.log('r.rows=', r.rows, 'r.rows.length=', r.rows.length, 'Array.isArray(r.rows)=', Array.isArray(r.rows))
+console.log('r.rows[0]=', r.rows[0])
+console.log('r.rowCount=', r.rowCount)
+await conn.query('ROLLBACK')
+await pool.end()

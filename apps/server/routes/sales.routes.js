@@ -12,7 +12,7 @@
 import express from 'express'
 import { getPool } from '../config/db.js'
 import { requireAuth, requirePermission } from '../middleware/auth.js'
-import { nextEntryNo, insertJournalEntry } from '../engine/accounting.js'
+import { nextEntryNo, nextInvoiceNo, insertJournalEntry, acctIds } from '../engine/accounting.js'
 import { auditLog } from '../middleware/audit.js'
 
 const router = express.Router()
@@ -51,7 +51,7 @@ router.post('/', requireAuth, requirePermission('sales.create'), async (req, res
          total_amount, paid_amount, remaining_amount, notes, status, created_by)
          VALUES ($1, COALESCE($2, current_date), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'draft', $17)
          RETURNING *`,
-        [f.invoice_no || ('INV-' + Date.now().toString(36).toUpperCase()), f.invoice_date, f.invoice_time || new Date().toTimeString().slice(0, 5),
+        [f.invoice_no || (await nextInvoiceNo(conn)), f.invoice_date, f.invoice_time || new Date().toTimeString().slice(0, 5),
          f.customer_id ? Number(f.customer_id) : null, f.branch_id ? Number(f.branch_id) : null,
          f.store_id ? Number(f.store_id) : null, f.sale_type || 'retail', f.payment_method || null, f.currency || 'YER',
          Number(f.total_before_discount || 0), Number(f.total_discount || 0), Number(f.total_tax || 0),
@@ -118,13 +118,31 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
     /* قيد مزدوج */
     const entryNo = await nextEntryNo(conn)
     const jeLines = []
-    const cashAcct = s.cash_account_id || 1
-    const revAcct = s.revenue_account_id || 18
-    const cogsAcct = 22
-    const invAcct = 5
-    const custAcct = s.customer_account_id || 6
+    const ids = await acctIds(conn)
+    const cashAcct = Number(s.cash_account_id) || ids.cash
+    const revAcct = Number(s.revenue_account_id) || ids.revenue
+    const cogsAcct = ids.cogs
+    const invAcct = ids.inventory
+    const custAcct = Number(s.customer_account_id) || ids.customer_ar
+    if (!cashAcct || !revAcct || !cogsAcct || !invAcct || !custAcct) throw Object.assign(new Error('حسابات محاسبية غير مهيأة في النظام'), { status: 500 })
     for (const l of lines.rows) {
       const item = itemMap.get(l.item_id)
+      /* تُحدَّث التكلفة في السطر إذا كانت صفراً (يُحسب متوسط تكلفة الدفعة FEFO) */
+      if (Number(l.cost_at_sale || 0) <= 0 && Number(l.quantity || 0) > 0) {
+        const batchSel2 = l.batch_id
+        const avgRow = await conn.query(
+          `SELECT COALESCE(SUM(m.quantity * m.unit_cost),0) / NULLIF(SUM(m.quantity),0) AS avg_cost
+           FROM stock_movements m
+           WHERE m.item_id = $1 AND m.store_id = $2 AND m.movement_type = 'in' AND m.quantity > 0
+             ${batchSel2 ? 'AND m.batch_id = $3' : ''}`.replace('$3', '$3'),
+          batchSel2 ? [l.item_id, s.store_id, batchSel2] : [l.item_id, s.store_id],
+        )
+        const avgCost = Number(avgRow.rows[0].avg_cost || 0)
+        if (avgCost > 0) {
+          l.cost_at_sale = Number(l.quantity) * avgCost
+          await conn.query(`UPDATE sales_lines SET cost_at_sale = $1 WHERE id = $2`, [l.cost_at_sale, l.id])
+        }
+      }
       /* الإيراد + تكلفة البضاعة المباعة */
       jeLines.push({ account_id: custAcct, description: `مبيعات: ${s.invoice_no}`, debit: Number(l.line_total || 0), credit: 0 })
       jeLines.push({ account_id: revAcct, description: `إيراد مبيعات ${s.invoice_no}`, debit: 0, credit: Number(l.line_total || 0) })
@@ -150,32 +168,33 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
       let batchSel = l.batch_id
       if (batchSel) {
         await conn.query(
-          `UPDATE stock_movements SET reserved_quantity = reserved_quantity + $1
+          `UPDATE stock_movements SET reserved_quantity = reserved_quantity + $1::numeric
            WHERE item_id = $2 AND batch_id = $3 AND store_id = $4`,
           [remaining, l.item_id, batchSel, s.store_id],
         )
       }
       while (remaining > 0) {
+        /* لا نعدّل quantity في حركات in نهائيًا — ندخل حركة out سالبة لكل كمية مباعة (خصم واحد فقط) */
         const target = await conn.query(
-          `UPDATE stock_movements SET quantity = quantity - LEAST($1, quantity)
-           WHERE id IN (SELECT id FROM stock_movements
-                        WHERE item_id = $2 AND store_id = $3
-                          AND movement_type = 'in' AND quantity - reserved_quantity > 0
-                          ${batchSel ? 'AND batch_id = ' + Number(batchSel) : ''}
-                        ORDER BY created_at ASC LIMIT 1)
-           RETURNING id, quantity`,
-          [remaining, l.item_id, s.store_id],
+          `SELECT id FROM stock_movements
+           WHERE item_id = $1 AND store_id = $2
+             AND movement_type = 'in' AND quantity - reserved_quantity > 0
+             ${batchSel ? 'AND batch_id = ' + Number(batchSel) : ''}
+           ORDER BY created_at ASC LIMIT 1`,
+          [l.item_id, s.store_id],
         )
         if (!target.rows.length) break
-        const take = Number(target.rows[0].quantity)
+        const available = await conn.query(
+          `SELECT quantity - reserved_quantity AS avail FROM stock_movements WHERE id = $1 FOR UPDATE`, [target.rows[0].id])
+        if (!available.rows.length) break
+        const take = Math.min(remaining, Number(available.rows[0].avail))
         remaining -= take
         await conn.query(
           `INSERT INTO stock_movements (item_id, batch_id, store_id, movement_type, quantity, unit_cost,
              ref_kind, ref_id, created_by)
-           VALUES ($1,$2,$3,'out',-$4,$5,'sale',$6,$7)`,
+           VALUES ($1,$2,$3,'out',-($4::numeric),$5,'sale',$6,$7)`,
           [l.item_id, batchSel || target.rows[0].batch_id, s.store_id, take, Number(l.cost_at_sale || 0), id, req.user.id],
         )
-        if (take <= 0) break
       }
     }
     await conn.query("UPDATE sales_invoices SET status = 'final' WHERE id = $1", [id])
@@ -247,8 +266,10 @@ router.post('/sales-returns/:id/post', requireAuth, requirePermission('sales.cre
     if (!r) throw Object.assign(new Error('المرتجع غير موجود'), { status: 404 })
     const lines = await conn.query('SELECT * FROM sales_return_lines WHERE return_id = $1', [id])
     const entryNo = await nextEntryNo(conn)
-    const revAcct = 18
-    const custAcct = 6
+    const ids = await acctIds(conn)
+    const revAcct = ids.sales_ret || ids.revenue
+    const custAcct = ids.customer_ar
+    if (!revAcct || !custAcct) throw Object.assign(new Error('حسابات محاسبية غير مهيأة في النظام'), { status: 500 })
     const jeLines = [
       { account_id: revAcct, description: `مرتجع مبيعات ${r.return_no}`, debit: Number(r.total_amount || 0), credit: 0 },
       { account_id: custAcct, description: `إلغاء ذمم مرتجع ${r.return_no}`, debit: 0, credit: Number(r.total_amount || 0) },

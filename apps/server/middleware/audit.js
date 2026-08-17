@@ -1,16 +1,17 @@
 /* ============================================
    سجل التدقيق المركزي
+   جدول audit_logs الفعلي: id, user_id, action, ref_kind, ref_id, details (jsonb), created_at
    ============================================ */
 export async function auditLog(req, action, refKind, refId, detail = null) {
   try {
+    const { query } = await import('../config/db.js')
     const userId = req.user?.id || null
-    const userName = req.user?.full_name || req.user?.username || null
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || null
-    await (await import('../config/db.js')).query(
-      `INSERT INTO audit_logs (user_id, user_name, action, ref_kind, ref_id, detail, ip)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, userName, action, refKind || null, refId != null ? Number(refId) : null,
-       detail != null ? JSON.stringify(detail) : null, ip],
+    const details = detail != null ? (typeof detail === 'object' ? detail : { note: String(detail) }) : null
+    await query(
+      `INSERT INTO audit_logs (user_id, action, ref_kind, ref_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, action, refKind || null, refId != null ? Number(refId) : null,
+       details != null ? JSON.stringify(details) : null],
     )
   } catch (err) {
     console.error('[audit error]', err.message)

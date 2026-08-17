@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
   store_id int REFERENCES stores(id) ON DELETE SET NULL,
   movement_type text NOT NULL CHECK (movement_type IN ('in','out','adjust')),
   quantity numeric(18,2) NOT NULL DEFAULT 0,
+  reserved_quantity numeric(18,2) NOT NULL DEFAULT 0,
   unit_cost numeric(18,2) DEFAULT 0,
   ref_kind text,                        -- purchase, sale, return, transfer, opening
   ref_id int,
@@ -151,11 +152,11 @@ CREATE TABLE IF NOT EXISTS purchases (
   payment_method text DEFAULT 'credit' CHECK (payment_method IN ('cash','credit','bank')),
   currency text DEFAULT 'YER',
   notes text,
-  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','pending','received','posted','cancelled')),
+    status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','pending','received','posted','cancelled')),
+  posted boolean NOT NULL DEFAULT false,
   created_by int REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS purchase_lines (
   id serial PRIMARY KEY,
   purchase_id int NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
@@ -199,12 +200,12 @@ CREATE TABLE IF NOT EXISTS sales_invoices (
   total_amount numeric(18,2) NOT NULL DEFAULT 0,
   paid_amount numeric(18,2) NOT NULL DEFAULT 0,
   remaining_amount numeric(18,2) NOT NULL DEFAULT 0,
-  notes text,
+    notes text,
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','final','cancelled')),
+  posted boolean NOT NULL DEFAULT false,
   created_by int REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS sales_lines (
   id serial PRIMARY KEY,
   invoice_id int NOT NULL REFERENCES sales_invoices(id) ON DELETE CASCADE,
@@ -231,11 +232,11 @@ CREATE TABLE IF NOT EXISTS sales_returns (
   reason text,
   total_amount numeric(18,2) NOT NULL DEFAULT 0,
   notes text,
-  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','final','cancelled')),
+    status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','final','cancelled')),
+  posted boolean NOT NULL DEFAULT false,
   created_by int REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS sales_return_lines (
   id serial PRIMARY KEY,
   return_id int NOT NULL REFERENCES sales_returns(id) ON DELETE CASCADE,
@@ -255,12 +256,12 @@ CREATE TABLE IF NOT EXISTS collections (
   amount numeric(18,2) NOT NULL,
   payment_method text DEFAULT 'cash' CHECK (payment_method IN ('cash','bank','check','other')),
   cash_box_id int REFERENCES cash_boxes(id) ON DELETE SET NULL,
-  receipt_no text,
+    receipt_no text,
   notes text,
+  posted boolean NOT NULL DEFAULT false,
   created_by int REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS supplier_payments (
   id serial PRIMARY KEY,
   payment_no text UNIQUE,
@@ -268,13 +269,14 @@ CREATE TABLE IF NOT EXISTS supplier_payments (
   supplier_id int REFERENCES suppliers(id) ON DELETE SET NULL,
   amount numeric(18,2) NOT NULL,
   payment_method text DEFAULT 'cash' CHECK (payment_method IN ('cash','bank','check','other')),
-  cash_box_id int REFERENCES cash_boxes(id) ON DELETE SET NULL,
+    cash_box_id int REFERENCES cash_boxes(id) ON DELETE SET NULL,
   notes text,
+  posted boolean NOT NULL DEFAULT false,
   created_by int REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 -- ---------- قيود اليومية (المحاسبة المزدوجة) ----------
+
 CREATE TABLE IF NOT EXISTS journal_entries (
   id serial PRIMARY KEY,
   entry_no text UNIQUE,

@@ -26,7 +26,7 @@ router.post('/', requireAuth, requirePermission('accounts.write'), async (req, r
     if (!code || !name || !type) return res.status(400).json({ error: 'الكود والاسم والنوع مطلوبة' })
     const exists = await queryOne('SELECT id FROM chart_of_accounts WHERE code = $1', [String(code).trim()])
     if (exists) return res.status(409).json({ error: 'كود الحساب موجود مسبقًا' })
-    const { rows } = await query(
+    const rows = await query(
       `INSERT INTO chart_of_accounts (code, number, name, type, parent_id, balance_direction, sort_order)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [String(code).trim(), number || String(code), name, type, parent_id != null ? String(parent_id).trim() || null : null,
@@ -51,7 +51,7 @@ router.patch('/:id', requireAuth, requirePermission('accounts.write'), async (re
     if (sort_order != null) { parts.push(`sort_order = $${i++}`); values.push(Number(sort_order)) }
     if (!parts.length) return res.status(400).json({ error: 'لا توجد بيانات للتعديل' })
     values.push(id)
-    const { rows } = await query(`UPDATE chart_of_accounts SET ${parts.join(', ')} WHERE id = $${i} RETURNING *`, values)
+    const rows = await query(`UPDATE chart_of_accounts SET ${parts.join(', ')} WHERE id = $${i} RETURNING *`, values)
     if (!rows[0]) return res.status(404).json({ error: 'الحساب غير موجود' })
     await auditLog(req, 'account.update', 'account', id, req.body)
     res.json(rows[0])

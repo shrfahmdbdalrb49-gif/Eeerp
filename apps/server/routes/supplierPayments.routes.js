@@ -6,7 +6,7 @@
 import express from 'express'
 import { getPool } from '../config/db.js'
 import { requireAuth, requirePermission } from '../middleware/auth.js'
-import { nextEntryNo, insertJournalEntry } from '../engine/accounting.js'
+import { nextEntryNo, nextSupplierPayNo, insertJournalEntry, acctIds } from '../engine/accounting.js'
 import { auditLog } from '../middleware/audit.js'
 
 const router = express.Router()
@@ -37,16 +37,17 @@ router.post('/', requireAuth, requirePermission('payments.create'), async (req, 
       `INSERT INTO supplier_payments (payment_no, payment_date, supplier_id, amount,
          payment_method, cash_box_id, notes, created_by)
        VALUES ($1, COALESCE($2, current_date), $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [f.payment_no || ('SP-' + Date.now().toString(36).toUpperCase()), f.payment_date,
+      [f.payment_no || (await nextSupplierPayNo(conn)), f.payment_date,
        Number(f.supplier_id), Number(f.amount), f.payment_method || 'cash',
        f.cash_box_id ? Number(f.cash_box_id) : null, f.notes || null, req.user.id],
     )
     const pid = rows[0].id
     const entryNo = await nextEntryNo(conn)
-    const supAcct = f.supplier_account_id || 12
-    const cashAcct = f.cash_account_id || 1
+    const ids = await acctIds(conn)
+    const supAcct = Number(f.supplier_account_id) || ids.supplier_ap
+    const cashAcct = Number(f.cash_account_id) || ids.cash
     await insertJournalEntry(conn, {
-      entryNo, entryDate: f.payment_date,
+      entryNo, entryDate: f.payment_date || new Date().toISOString().slice(0,10),
       description: `سداد مورد ${rows[0].payment_no}`,
       refKind: 'supplier_payment', refId: pid, userId: req.user.id,
       lines: [

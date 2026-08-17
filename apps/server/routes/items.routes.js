@@ -44,7 +44,7 @@ router.post('/', requireAuth, requirePermission('items.write'), async (req, res,
       const exists = await queryOne('SELECT id FROM items WHERE barcode = $1', [barcode])
       if (exists) return res.status(409).json({ error: 'الباركود مستخدم لصنف آخر' })
     }
-    const { rows } = await query(
+    const rows = await query(
       `INSERT INTO items (code, barcode, name, name_en, unit, category, purchase_unit_cost,
        sale_price, min_stock, taxable, tax_rate, profit_account_id, purchase_account_id, inventory_account_id, cogs_account_id, active)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true) RETURNING *`,
@@ -74,7 +74,7 @@ router.patch('/:id', requireAuth, requirePermission('items.write'), async (req, 
     }
     if (!parts.length) return res.status(400).json({ error: 'لا توجد بيانات للتعديل' })
     values.push(id)
-    const { rows } = await query(`UPDATE items SET ${parts.join(', ')} WHERE id = $${i} RETURNING *`, values)
+    const rows = await query(`UPDATE items SET ${parts.join(', ')} WHERE id = $${i} RETURNING *`, values)
     if (!rows[0]) return res.status(404).json({ error: 'الصنف غير موجود' })
     await auditLog(req, 'item.update', 'item', id, req.body)
     res.json(rows[0])
@@ -84,7 +84,7 @@ router.patch('/:id', requireAuth, requirePermission('items.write'), async (req, 
 router.delete('/:id', requireAuth, requirePermission('items.write'), async (req, res, next) => {
   try {
     const id = Number(req.params.id)
-    const { rows } = await query('UPDATE items SET active = false WHERE id = $1 RETURNING id', [id])
+    const rows = await query('UPDATE items SET active = false WHERE id = $1 RETURNING id', [id])
     if (!rows.length) return res.status(404).json({ error: 'الصنف غير موجود' })
     await auditLog(req, 'item.delete', 'item', id)
     res.json({ ok: true })

@@ -20,6 +20,7 @@ import supplierPaymentsRoutes from './routes/supplierPayments.routes.js'
 import journalsRoutes from './routes/journals.routes.js'
 import reportsRoutes from './routes/reports.routes.js'
 import auditRoutes from './routes/audit.routes.js'
+import setupRoutes from './routes/setup.routes.js'
 import { branchesRouter, storesRouter, cashBoxesRouter, customersRouter, suppliersRouter, rolesRouter } from './routes/misc.routes.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -48,7 +49,6 @@ app.use('/api/journals', journalsRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/setup', setupRoutes)
-import setupRoutes from './routes/setup.routes.js'
 app.use('/api/branches', branchesRouter)
 app.use('/api/stores', storesRouter)
 app.use('/api/cash-boxes', cashBoxesRouter)
@@ -69,7 +69,7 @@ app.use((req, res) => res.status(404).json({ error: 'endpoint not found: ' + req
 
 /* معالج الأخطاء العام */
 app.use((err, req, res, next) => {
-  console.error('[ERR]', err?.message || err)
+  console.error('[ERR]', err?.message || err); if (err?.stack) console.error('   ', err.stack.split('\n').slice(1, 4).join(' '))
   res.status(err?.status || 500).json({ error: err?.message || 'خطأ داخلي في الخادم' })
 })
 

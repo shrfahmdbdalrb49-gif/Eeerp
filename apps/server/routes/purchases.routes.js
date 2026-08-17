@@ -11,7 +11,7 @@
 import express from 'express'
 import { getPool } from '../config/db.js'
 import { requireAuth, requirePermission } from '../middleware/auth.js'
-import { nextEntryNo, insertJournalEntry } from '../engine/accounting.js'
+import { nextEntryNo, nextPurchaseNo, insertJournalEntry, acctIds } from '../engine/accounting.js'
 import { auditLog } from '../middleware/audit.js'
 
 const router = express.Router()
@@ -51,7 +51,7 @@ router.post('/', requireAuth, requirePermission('purchases.create'), async (req,
          payment_method, currency, notes, status, created_by)
          VALUES ($1, COALESCE($2, current_date), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'draft', $14)
          RETURNING *`,
-        [f.purchase_no || ('PO-' + Date.now().toString(36).toUpperCase()), f.purchase_date,
+        [f.purchase_no || (await nextPurchaseNo(conn)), f.purchase_date,
          f.supplier_id ? Number(f.supplier_id) : null, f.branch_id ? Number(f.branch_id) : null,
          f.store_id ? Number(f.store_id) : null,
          Number(f.total_before_discount || 0), Number(f.total_discount || 0),
@@ -83,6 +83,7 @@ router.post('/', requireAuth, requirePermission('purchases.create'), async (req,
 })
 
 router.post('/:id/post', requireAuth, requirePermission('purchases.post'), async (req, res, next) => {
+  
   const conn = await getPool().connect()
   try {
     const id = Number(req.params.id)
@@ -100,17 +101,19 @@ router.post('/:id/post', requireAuth, requirePermission('purchases.post'), async
     let totalDebitInventory = 0
     for (const l of lines.rows) {
       /* المخزون (مدين) */
-      const invAcct = itemMap.get(l.item_id)?.inventory_account_id || 5
+      const ids = await acctIds(conn)
+      const invAcct = Number(itemMap.get(l.item_id)?.inventory_account_id) || ids.inventory
       totalDebitInventory += Number(l.line_total || 0)
       /* المورد (دائن) */
-      const supAcct = p.supplier_account_id || 12
+      const supAcct = Number(p.supplier_account_id) || ids.supplier_ap
       jeLines.push({ account_id: invAcct, description: `مشتريات: ${p.purchase_no} - ${itemMap.get(l.item_id)?.name}`, debit: Number(l.line_total || 0), credit: 0 })
       jeLines.push({ account_id: supAcct, description: `فاتورة مورد: ${p.purchase_no}`, debit: 0, credit: Number(l.line_total || 0) })
     }
     /* لو كان هناك دفع فوري من الصندوق */
     if (Number(p.paid_amount) > 0) {
+      const ids2 = await acctIds(conn)
       jeLines.push({ account_id: supAcct, description: `دفعة مقدمة - ${p.purchase_no}`, debit: Number(p.paid_amount), credit: 0 })
-      jeLines.push({ account_id: p.cash_account_id || 1, description: `دفعة من الصندوق - ${p.purchase_no}`, debit: 0, credit: Number(p.paid_amount) })
+      jeLines.push({ account_id: Number(p.cash_account_id) || ids2.cash, description: `دفعة من الصندوق - ${p.purchase_no}`, debit: 0, credit: Number(p.paid_amount) })
     }
     await insertJournalEntry(conn, {
       entryNo, entryDate: p.purchase_date,
@@ -139,10 +142,10 @@ router.post('/:id/post', requireAuth, requirePermission('purchases.post'), async
     res.json({ ok: true, entry_no: entryNo })
   } catch (err) {
     await conn.query('ROLLBACK').catch(() => {})
+    console.error('[POST-ERR]', err?.message, err?.detail || '', err?.stack?.split('\n').slice(1, 3).join(' | '))
     next(err)
   } finally { conn.release() }
 })
-
 router.post('/:id/cancel', requireAuth, requirePermission('purchases.create'), async (req, res, next) => {
   try {
     const id = Number(req.params.id)
@@ -162,9 +165,8 @@ router.post('/:id/cancel', requireAuth, requirePermission('purchases.create'), a
       res.json({ ok: true })
     } finally { conn.release() }
   } catch (err) {
-    await (async () => { try { await err; } catch {} })()
+    await conn?.query?.('ROLLBACK').catch(() => {})
     next(err)
   }
 })
-
 export default router

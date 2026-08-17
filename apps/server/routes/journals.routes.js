@@ -31,7 +31,7 @@ router.get('/:id', requireAuth, requirePermission('journals.read'), async (req, 
     try {
       const head = await conn.query('SELECT * FROM journal_entries WHERE id = $1', [Number(req.params.id)])
       if (!head.rows[0]) return res.status(404).json({ error: 'القيد غير موجود' })
-      const lines = await conn.query('SELECT * FROM journal_entry_lines WHERE entry_id = $1 ORDER BY id', [head.rows[0].id])
+      const lines = await conn.query('SELECT * FROM journal_lines WHERE entry_id = $1 ORDER BY id', [head.rows[0].id])
       res.json({ ...head.rows[0], lines: lines.rows })
     } finally { conn.release() }
   } catch (err) { next(err) }
@@ -49,6 +49,7 @@ router.post('/', requireAuth, requirePermission('journals.create'), async (req, 
       return res.status(400).json({ error: `القيد غير متوازن: المدين ${totalDebit} والدائن ${totalCredit}` })
     }
     if (totalDebit <= 0) return res.status(400).json({ error: 'إجمالي القيد يجب أن يكون أكبر من صفر' })
+    await conn.query('BEGIN')
     const entryNo = await nextEntryNo(conn)
     const entry = await insertJournalEntry(conn, {
       entryNo, entryDate: f.entryDate,
@@ -56,9 +57,13 @@ router.post('/', requireAuth, requirePermission('journals.create'), async (req, 
       refKind: f.refKind || 'manual', refId: f.refId || null,
       userId: req.user.id, lines, posted: f.posted !== false,
     })
-    await auditLog(req, 'journal.create', 'journal_entry', entry.id, { entry_no: entry.entry_no })
-    res.status(201).json(entry)
-  } catch (err) { next(err) }
+    await conn.query('COMMIT')
+    await auditLog(req, 'journal.create', 'journal_entry', entry, { entry_no: entryNo })
+    res.status(201).json({ id: entry, entry_no: entryNo })
+  } catch (err) {
+    await conn.query('ROLLBACK').catch(() => {})
+    next(err)
+  } finally { conn.release() }
 })
 
 router.delete('/:id', requireAuth, requirePermission('journals.create'), async (req, res, next) => {
@@ -68,7 +73,8 @@ router.delete('/:id', requireAuth, requirePermission('journals.create'), async (
       const head = await conn.query('SELECT * FROM journal_entries WHERE id = $1', [Number(req.params.id)])
       if (!head.rows[0]) return res.status(404).json({ error: 'القيد غير موجود' })
       if (head.rows[0].posted) return res.status(400).json({ error: 'لا يمكن حذف قيد مرحّل' })
-      await conn.query('DELETE FROM journal_entry_lines WHERE entry_id = $1', [head.rows[0].id])
+      if (head.rows[0].locked) return res.status(403).json({ error: 'القيد داخل فترة محاسبية مقفلة' })
+      await conn.query('DELETE FROM journal_lines WHERE entry_id = $1', [head.rows[0].id])
       await conn.query('DELETE FROM journal_entries WHERE id = $1', [head.rows[0].id])
       await auditLog(req, 'journal.delete', 'journal_entry', head.rows[0].id)
       res.json({ ok: true })

@@ -27,7 +27,7 @@ router.post('/', requireAuth, requirePermission('users.write'), async (req, res,
     const exists = await queryOne('SELECT id FROM users WHERE username = $1', [String(username).trim().toLowerCase()])
     if (exists) return res.status(409).json({ error: 'اسم المستخدم موجود مسبقًا' })
     const hash = await bcrypt.hash(String(password), 10)
-    const { rows } = await query(
+    const rows = await query(
       `INSERT INTO users (username, full_name, password_hash, role, active)
        VALUES ($1, $2, $3, $4, $5) RETURNING id, username, full_name, role, active`,
       [String(username).trim().toLowerCase(), full_name || username, hash, role || 'sales', !!active],
@@ -50,7 +50,7 @@ router.patch('/:id', requireAuth, requirePermission('users.write'), async (req, 
     if (active != null) { parts.push(`active = $${i++}`); values.push(!!active) }
     if (!parts.length) return res.status(400).json({ error: 'لا توجد بيانات للتعديل' })
     values.push(id)
-    const { rows } = await query(`UPDATE users SET ${parts.join(', ')} WHERE id = $${i} RETURNING id, username, full_name, role, active`, values)
+    const rows = await query(`UPDATE users SET ${parts.join(', ')} WHERE id = $${i} RETURNING id, username, full_name, role, active`, values)
     if (!rows[0]) return res.status(404).json({ error: 'المستخدم غير موجود' })
     await auditLog(req, 'user.update', 'user', id, req.body)
     res.json(rows[0])
@@ -61,7 +61,7 @@ router.delete('/:id', requireAuth, requirePermission('users.write'), async (req,
   try {
     const id = Number(req.params.id)
     if (id === req.user.id) return res.status(400).json({ error: 'لا يمكن حذف حسابك الحالي' })
-    const { rows } = await query('DELETE FROM users WHERE id = $1 RETURNING id', [id])
+    const rows = await query('DELETE FROM users WHERE id = $1 RETURNING id', [id])
     if (!rows.length) return res.status(404).json({ error: 'المستخدم غير موجود' })
     await auditLog(req, 'user.delete', 'user', id)
     res.json({ ok: true })
