@@ -99,7 +99,7 @@ router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (re
               COALESCE(SUM(sm.reserved_quantity),0) AS reserved,
               COALESCE(SUM(sm.quantity),0) - COALESCE(SUM(sm.reserved_quantity),0) AS qty_available
        FROM batches b
-       LEFT JOIN stock_movements sm ON sm.batch_id = b.id
+       LEFT JOIN stock_movements sm ON sm.batch_id = b.id AND sm.movement_type = 'in'
        WHERE b.item_id = $1
        GROUP BY b.id ORDER BY b.expiry_date`,
       [Number(req.params.id)],
