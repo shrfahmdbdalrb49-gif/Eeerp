@@ -20,6 +20,14 @@ router.post('/retry', async (req, res) => {
     const { splitSQL } = await import('../sql/split.js')
     const dir = dirname(fileURLToPath(import.meta.url))
     const errors = []
+    // 0) ترقية الجداول القديمة — إضافة الأعمدة الناقصة (posted, reserved_quantity, status...)
+    try {
+      const mig = await readFile(join(dir, '..', 'sql', 'migrations.sql'), 'utf8')
+      const migStmts = splitSQL(mig)
+      for (const stmt of migStmts) {
+        try { await pool.query(stmt) } catch (e) { /* الأعمدة الموجودة تُتجاهل بأمان */ }
+      }
+    } catch (e) { errors.push(`migrations: ${e.message}`) }
     // 1) تهيئة الجداول
     const schema = await readFile(join(dir, '..', 'sql', 'schema.sql'), 'utf8')
     const stmts = splitSQL(schema)
