@@ -7,28 +7,28 @@
 */
 const CACHE_NAME = 'sharaf-erp-v2';
 const SHELL = [
-  '/',
-  '/manifest.webmanifest',
-  '/sw.js',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/Eeerp/',
+  '/Eeerp/manifest.webmanifest',
+  '/Eeerp/sw.js',
+  '/Eeerp/icon-192.png',
+  '/Eeerp/icon-512.png'
 ];
 
 // ترقية قشر النظام كاملًا بعد التثبيت (كل js/css من index.html المنشور)
 async function precacheShell() {
   try {
-    const indexRes = await fetch('/');
+    const indexRes = await fetch('/Eeerp/');
     if (!indexRes.ok) return;
     const html = await indexRes.text();
-    const assets = ['/'];
+    const assets = ['/Eeerp/'];
     const mjs = html.match(/src="[^"]+\.js[^"]*"/g) || [];
     const css = html.match(/href="[^"]+\.css[^"]*"/g) || [];
     mjs.forEach((s) => assets.push(s.replace(/^src="|"\s*$/g, '')));
     css.forEach((s) => assets.push(s.replace(/^href="|"\s*$/g, '')));
     const cache = await caches.open(CACHE_NAME);
-    await cache.put('/', new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+    await cache.put('/Eeerp/', new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
     for (const a of assets) {
-      if (a.startsWith('/')) {
+      if (a.startsWith('/Eeerp/')) {
         try { const r = await fetch(a); if (r.ok) await cache.put(a, r.clone()); } catch {}
       }
     }
@@ -69,7 +69,7 @@ self.addEventListener('fetch', (e) => {
         if (cached) return cached;
         // آخر محاولة: إذا طلب التنقل الرئيسي فاشل وكل شيء فاشل، أعد الصفحة المخزنة من أي مسار
         if (e.request.mode === 'navigate') {
-          return caches.match('/');
+          return caches.match('/Eeerp/');
         }
         return new Response('Offline', { status: 503, statusText: 'Offline' });
       });

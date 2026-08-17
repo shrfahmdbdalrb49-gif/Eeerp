@@ -16,26 +16,11 @@
       @menu-change="handleHeaderMenuChange"
     />
 
-    <!-- شريط الأدوات -->
-    <Toolbar
-      @new="handleNew"
-      @save="handleSave"
-      @post="handlePost"
-      @print="handlePrint"
-      @search="handleSearch"
-      @close="handleClose"
-    />
+    <!-- شريط القائمة الرئيسي الأفقي (Desktop ERP Menu Bar) -->
+    <MenuBar :active-page="activePage" @select="selectPage" />
 
     <!-- الحاوية الرئيسية -->
     <div class="main-container">
-      <!-- القائمة الجانبية -->
-      <Sidebar
-        :active-menu="activeMenu"
-        :collapsed="sidebarCollapsed"
-        :active-page="activePage"
-        @toggle="sidebarCollapsed = !sidebarCollapsed"
-        @select="selectPage($event)"
-      />
 
       <!-- مساحة العمل (النوافذ) -->
       <Workspace
@@ -146,8 +131,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LoginScreen from './components/screens/LoginScreen.vue'
 import MainRibbon from './components/layout/MainRibbon.vue'
-import Toolbar from './components/layout/Toolbar.vue'
-import Sidebar from './components/layout/Sidebar.vue'
+import MenuBar from './components/layout/MenuBar.vue'
 import Workspace from './components/layout/Workspace.vue'
 import Taskbar from './components/layout/Taskbar.vue'
 import JournalScreen from './components/screens/JournalScreen.vue'
@@ -204,7 +188,6 @@ function handleHeaderMenuChange(valueOrEvent, page) {
   }
   activeMenu.value = valueOrEvent
 }
-const sidebarCollapsed = ref(window.innerWidth <= 768)
 const activeWindowId = ref('win-1')
 const activePage = ref(null)
 
@@ -455,8 +438,6 @@ function selectPage(page) {
   if (exists) {
     activeWindowId.value = exists.id
     exists.minimized = false
-    // إعادة القائمة الجانبية مطوية عند الانتقال إلى نافذة مفتوحة مسبقًا
-    sidebarCollapsed.value = true
     return
   }
   const newId = 'win-' + Date.now()
@@ -472,46 +453,19 @@ function selectPage(page) {
   }
   openWindows.value.push(newWin)
   activeWindowId.value = newId
-  // إغلاق القائمة الجانبية تلقائيًا بعد فتح النافذة الجديدة
-  sidebarCollapsed.value = true
 }
 
 // ---- اختصارات لوحة المفاتيح ----
-function handleKeydown(e) {
-  // F2 - جديد
-  if (e.key === 'F2') {
-    e.preventDefault()
-    handleNew()
-  }
-  // F8 - حفظ
-  if (e.key === 'F8') {
-    e.preventDefault()
-    handleSave()
-  }
-  // F10 - ترحيل
-  if (e.key === 'F10') {
-    e.preventDefault()
-    handlePost()
-  }
-  // F3 - بحث
-  if (e.key === 'F3') {
-    e.preventDefault()
-    handleSearch()
-  }
-  // Escape - إغلاق
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    handleClose()
-  }
-  // Ctrl+P - طباعة
-  if (e.ctrlKey && e.key === 'p') {
-    e.preventDefault()
-    handlePrint()
-  }
-}
+
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleKeydown)
+  // Ctrl+N — فتح وثيقة جديدة في الشاشة النشطة (بديل اختصارات الشريط القديم F2)
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleNewDoc()
+    }
+  })
   window.addEventListener('sharaf-logout', () => {
     authenticated.value = false
     currentUser.value = null
@@ -568,49 +522,20 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  // لا يوجد الآن مستمع عام لاختصارات لوحة المفاتيح
 })
 
 // ---- الإجراءات ----
-function handleNew() {
-  // الشاشات المعاد تصميمها (بواجهة Desktop ERP) تفتح نموذجًا جديدًا داخل نفس النافذة
-  const DOC_SCREEN_TYPES = ['purchases', 'sales-invoice', 'receipt-voucher', 'payment-voucher', 'supplier-payments']
+/**
+ * فتح وثيقة جديدة في الشاشة النشطة (تُستدعى من الشاشات الداخلية
+ * عبر حدث sharaf-new-doc — لم يعد هناك شريط أدوات علوي).
+ * اختصار Ctrl+N متاح أيضًا لتسهيل العمل المكتبي.
+ */
+function handleNewDoc() {
   const activeWin = openWindows.value.find((w) => w.id === activeWindowId.value)
-  if (activeWin && DOC_SCREEN_TYPES.includes(activeWin.type)) {
+  if (activeWin) {
     window.dispatchEvent(new CustomEvent('sharaf-new-doc', { detail: { windowId: activeWindowId.value } }))
-    return
   }
-  const newId = 'win-' + Date.now()
-  openWindows.value.push({
-    id: newId,
-    title: activeWin ? activeWin.title : 'نقطة البيع POS',
-    type: activeWin ? activeWin.type : 'pos',
-    page: activeWin ? (activeWin.page || activeWin.type) : 'pos',
-    status: 'draft',
-    minimized: false,
-    maximized: false
-  })
-  activeWindowId.value = newId
-}
-
-function handleSave() {
-  // الحفظ الفعلي يتم داخل كل شاشة (تخزين في IndexedDB)
-}
-
-function handlePost() {
-  // الترحيل الفعلي يتم داخل كل شاشة (قيود مزدوجة في IndexedDB)
-}
-
-function handlePrint() {
-  window.print()
-}
-
-function handleSearch() {
-  // البحث السريع يتم داخل كل شاشة عبر حقول البحث الفعلية
-}
-
-function handleClose() {
-  closeWindow(activeWindowId.value)
 }
 
 function onLoggedIn(user) {
@@ -654,6 +579,7 @@ function maximizeWindow(id) {
   flex: 1;
   display: flex;
   overflow: hidden;
+  position: relative;
 }
 
 /* شارة وضع الاستعراض */
