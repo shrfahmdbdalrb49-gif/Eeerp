@@ -31,17 +31,22 @@ export async function login(username, password) {
       const r = await serverLogin(username, password)
       return { ok: true, user: r.user }
     } catch (e) {
-      // فشل اتصال بالخادم (مثال: «محتوى مختلط» عند نشر GitHub Pages وعنوان الخادم localhost):
-      // نتحول تلقائيًا إلى التخزين المحلي ونكرر محاولة تسجيل الدخول محليًا
       const netErr = !e.status && /fetch|network|mixed content/i.test(e.message || '')
-      if (netErr) {
-        console.warn('[SharafERP] الخادم غير متاح (' + e.message + ') — تشغيل وضع الاستعراض التلقائي')
-        setStorageMode('local')
+      /* النظام سحابي بالكامل الآن — لا نتحول تلقائيًا إلى الوضع المحلي،
+         لأن ذلك كان يعلق الأجهزة في قاعدة IndexedDB قديمة تعرض
+         «مستخدم غير موجود أو معطّل». عند فشل الاتصال نعرض رسالة واضحة.
+         كملاذ أخير: إذا كان الجهاز قد عُلق سابقًا في وضع local،
+         نمسح قاعدة IndexedDB القديمة ونعيد المحاولة مرة واحدة. */
+      if (netErr && getStorageMode() === 'local') {
+        console.warn('[SharafERP] الخادم غير متاح — مسح قاعدة IndexedDB القديمة')
+        try { await db.delete() } catch {}
+        try { localStorage.removeItem('sharaf-storage-mode') } catch {}
         const { initSystem } = await import('./database.js')
         await initSystem()
-        return login(username, password)
+        const r = await serverLogin(username, password)
+        return { ok: true, user: r.user }
       }
-      return { ok: false, error: e.message || 'خطأ في المصادقة' }
+      return { ok: false, error: netErr ? 'تعذّر الاتصال بالخادم - تحقّق من الإنترنت وحاول مرة أخرى' : (e.message || 'خطأ في المصادقة') }
     }
   }
   const user = await db.users
