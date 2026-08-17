@@ -9,7 +9,7 @@ import { apiFetch } from './api.js'
 import * as engineServer from './engineServer.js'
 
 /* حالة وضع الخادم المركزي: المحركات تنفّذ العملية عبر API */
-function isServer() { return getStorageMode() === 'server' }
+export function isServer() { return getStorageMode() === 'server' }
 
 export function fmt(n) {
   const v = Number(n ?? 0)

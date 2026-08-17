@@ -154,8 +154,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db, isActive } from '../../db/database.js'
-import { fmt } from '../../db/engine.js'
+
 import { requirePermission } from '../../db/session.js'
+import { fmt, isServer } from '../../db/engine.js'
 
 const items = ref([])
 const stockInfo = ref({})
@@ -202,6 +203,33 @@ function expiryClass(exp) {
 function applySearch() { /* مفعّل عبر v-model */ }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const { apiFetch } = await import('../../db/api.js')
+      const rows = await apiFetch('/items')
+      items.value = (Array.isArray(rows) ? rows : []).map(it => ({
+        id: it.id, code: it.code, name: it.name, scientific: it.name_en || '',
+        category: it.category, unit: it.unit || 'حبة', barcode: it.barcode || '',
+        sellPrice: Number(it.sale_price || 0), costPrice: Number(it.purchase_unit_cost || 0),
+        minStock: Number(it.min_stock || 0), prescription: !!it.prescription,
+        active: it.active === true || it.active === 1 || it.active === 't' ? 1 : 0,
+      }))
+      const batches = await apiFetch('/batches')
+      const g = {}
+      for (const b of (Array.isArray(batches) ? batches : [])) {
+        if (!b.quarantined && b.qty > 0) {
+          const x = g[b.item_id] || { total: 0, cost: 0 }
+          x.total += b.qty
+          x.cost += b.qty * (b.cost ?? b.cost_price ?? 0)
+          if (!x.nextExpiry || (b.expiry_date && b.expiry_date < x.nextExpiry)) x.nextExpiry = b.expiry_date
+          g[b.item_id] = x
+        }
+      }
+      stockInfo.value = Object.fromEntries(Object.entries(g).map(([k, v]) => [Number(k), { total: v.total, avgCost: v.total ? v.cost / v.total : 0, nextExpiry: v.nextExpiry }]))
+      movements.value = new Set(Object.keys(g).map(Number))
+      return
+    } catch (e) { formError.value = 'فشل تحميل الأصناف من الخادم: ' + (e.message || e); return }
+  }
   items.value = await db.items.toArray()
   const batches = await db.batches.toArray()
   const g = {}
@@ -235,16 +263,33 @@ async function saveItem() {
     await requirePermission('items.write', editing.value ? 'تعديل صنف' : 'إضافة صنف')
     const f = { ...form.value }
     if (!f.name.trim()) throw new Error('أدخل اسم الصنف')
-    if (!f.code) {
-      const count = await db.items.count()
-      f.code = 'DRG-' + String(count + 1).padStart(3, '0')
+    if (isServer()) {
+      const { apiFetch } = await import('../../db/api.js')
+      if (editing.value) {
+        await apiFetch(`/items/${editing.value}`, { method: 'PATCH', body: JSON.stringify({
+          name: f.name, name_en: f.scientific || null, unit: f.unit, category: f.category || null,
+          barcode: f.barcode || null, sale_price: Number(f.sellPrice || 0),
+          purchase_unit_cost: Number(f.costPrice || 0), min_stock: Number(f.minStock || 0), active: true,
+        }) })
+      } else {
+        await apiFetch('/items', { method: 'POST', body: JSON.stringify({
+          name: f.name, name_en: f.scientific || null, unit: f.unit, category: f.category || null,
+          barcode: f.barcode || null, sale_price: Number(f.sellPrice || 0),
+          purchase_unit_cost: Number(f.costPrice || 0), min_stock: Number(f.minStock || 0),
+        }) })
+      }
+    } else {
+      if (!f.code) {
+        const count = await db.items.count()
+        f.code = 'DRG-' + String(count + 1).padStart(3, '0')
+      }
+      if (editing.value) await db.items.update(editing.value, { ...f, active: 1, updatedAt: Date.now() })
+      else await db.items.add({ ...f, active: 1, createdAt: Date.now(), updatedAt: Date.now() })
     }
-    if (editing.value) await db.items.update(editing.value, { ...f, active: 1, updatedAt: Date.now() })
-    else await db.items.add({ ...f, active: 1, createdAt: Date.now(), updatedAt: Date.now() })
     showForm.value = false
     await loadData()
   } catch (e) {
-    formError.value = e.message
+    formError.value = e.message || e
   } finally {
     saving.value = false
   }
@@ -253,15 +298,24 @@ async function saveItem() {
 async function handleDelete(it) {
   try {
     await requirePermission('items.write', 'حذف صنف')
-    if (movements.value.has(it.id)) {
-      await db.items.update(it.id, { active: 0, updatedAt: Date.now() })
-      await loadData()
-      return
+    if (isServer()) {
+      const { apiFetch } = await import('../../db/api.js')
+      if (movements.value.has(it.id)) {
+        await apiFetch(`/items/${it.id}`, { method: 'PATCH', body: JSON.stringify({ active: false }) })
+      } else {
+        await apiFetch(`/items/${it.id}`, { method: 'DELETE' })
+      }
+    } else {
+      if (movements.value.has(it.id)) {
+        await db.items.update(it.id, { active: 0, updatedAt: Date.now() })
+        await loadData()
+        return
+      }
+      await db.items.delete(it.id)
     }
-    await db.items.delete(it.id)
     await loadData()
   } catch (e) {
-    formError.value = e.message
+    formError.value = e.message || e
   }
 }
 

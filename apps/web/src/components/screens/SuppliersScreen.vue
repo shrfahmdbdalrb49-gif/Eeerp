@@ -101,7 +101,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db } from '../../db/database.js'
-import { fmt } from '../../db/engine.js'
+import { fmt, isServer } from '../../db/engine.js'
 import { requirePermission } from '../../db/session.js'
 
 const suppliers = ref([])
@@ -113,6 +113,19 @@ const formError = ref('')
 const form = ref({ code: '', name: '', phone: '', notes: '' })
 
 async function enrichSupplier(s) {
+  if (isServer()) {
+    try {
+      const { apiFetch } = await import('../../db/api.js')
+      const purchases = await apiFetch(`/purchases?supplier_id=${s.id}`, { fallback: [] })
+      const invs = (Array.isArray(purchases) ? purchases : []).filter(i => String(i.supplier_id) === String(s.id))
+      const invoiceCount = invs.length
+      const creditPurchases = invs.filter(i => i.payment_type === 'credit').reduce((sum, i) => sum + Number(i.total || 0), 0)
+      const totalPurchases = invs.reduce((sum, i) => sum + Number(i.total || 0), 0)
+      const payments = await apiFetch(`/supplier-payments?supplier_id=${s.id}`, { fallback: [] })
+      const totalPaid = (Array.isArray(payments) ? payments : []).reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      return { ...s, invoiceCount, totalPurchases, totalPaid, balance: creditPurchases - totalPaid, hasPurchases: invoiceCount > 0 || totalPaid > 0 }
+    } catch { /* تابع بدون بيانات مالية */ }
+  }
   const invoices = await db.purchaseInvoices.where('supplierId').equals(s.id).toArray()
   const invoiceCount = invoices.length
   const creditPurchases = invoices.filter(i => i.paymentType === 'credit').reduce((sum, i) => sum + (i.total || 0), 0)
@@ -134,6 +147,14 @@ const totalBalance = computed(() => suppliers.value.reduce((s, x) => s + Math.ma
 function applySearch() { /* مفعّل عبر v-model */ }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const { apiFetch } = await import('../../db/api.js')
+      const rows = await apiFetch('/suppliers')
+      suppliers.value = await Promise.all((Array.isArray(rows) ? rows : []).filter(s => s.active === true || s.active === 1 || s.active === 't').map(enrichSupplier))
+      return
+    } catch (e) { formError.value = 'فشل تحميل الموردين من الخادم: ' + (e.message || e); return }
+  }
   const raw = await db.suppliers.toArray()
   suppliers.value = await Promise.all(raw.map(enrichSupplier))
 }
@@ -154,16 +175,24 @@ async function saveSupplier() {
     await requirePermission('suppliers', editing.value ? 'تعديل مورد' : 'إضافة مورد')
     const f = { ...form.value }
     if (!f.name.trim()) throw new Error('أدخل اسم المورد')
-    if (!f.code) {
-      const count = await db.suppliers.count()
-      f.code = 'SUP-' + String(count + 1).padStart(3, '0')
+    if (isServer()) {
+      const { apiFetch } = await import('../../db/api.js')
+      const payload = { name: f.name, phone: f.phone || null, address: f.notes || null, active: true }
+      if (f.code) payload.code = f.code
+      if (editing.value) await apiFetch(`/suppliers/${editing.value}`, { method: 'PATCH', body: JSON.stringify(payload) })
+      else await apiFetch('/suppliers', { method: 'POST', body: JSON.stringify(payload) })
+    } else {
+      if (!f.code) {
+        const count = await db.suppliers.count()
+        f.code = 'SUP-' + String(count + 1).padStart(3, '0')
+      }
+      if (editing.value) await db.suppliers.update(editing.value, { ...f, updatedAt: Date.now() })
+      else await db.suppliers.add({ ...f, status: 'active', createdAt: Date.now() })
     }
-    if (editing.value) await db.suppliers.update(editing.value, { ...f, updatedAt: Date.now() })
-    else await db.suppliers.add({ ...f, status: 'active', createdAt: Date.now() })
     showForm.value = false
     await loadData()
   } catch (e) {
-    formError.value = e.message
+    formError.value = e.message || e
   } finally {
     saving.value = false
   }
@@ -172,16 +201,21 @@ async function saveSupplier() {
 async function handleDelete(s) {
   try {
     await requirePermission('suppliers', 'حذف مورد')
-    const hasPurchases = await db.purchaseInvoices.where('supplierId').equals(s.id).count()
-    if (hasPurchases) {
-      await db.suppliers.update(s.id, { status: 'inactive', updatedAt: Date.now() })
+    if (isServer()) {
+      const { apiFetch } = await import('../../db/api.js')
+      await apiFetch(`/suppliers/${s.id}`, { method: 'PATCH', body: JSON.stringify({ active: false }) })
     } else {
-      await db.suppliers.delete(s.id)
-      await db.supplierPayments.where('supplierId').equals(s.id).delete()
+      const hasPurchases = await db.purchaseInvoices.where('supplierId').equals(s.id).count()
+      if (hasPurchases) {
+        await db.suppliers.update(s.id, { status: 'inactive', updatedAt: Date.now() })
+      } else {
+        await db.suppliers.delete(s.id)
+        await db.supplierPayments.where('supplierId').equals(s.id).delete()
+      }
     }
     await loadData()
   } catch (e) {
-    formError.value = e.message
+    formError.value = e.message || e
   }
 }
 

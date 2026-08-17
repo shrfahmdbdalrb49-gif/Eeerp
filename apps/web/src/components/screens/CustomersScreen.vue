@@ -108,7 +108,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { db } from '../../db/database.js'
-import { fmt } from '../../db/engine.js'
+import { fmt, isServer } from '../../db/engine.js'
 import { requirePermission } from '../../db/session.js'
 
 const customers = ref([])
@@ -120,6 +120,19 @@ const formError = ref('')
 const form = ref({ code: '', name: '', phone: '', notes: '', creditLimit: null })
 
 async function enrichCustomer(c) {
+  if (isServer()) {
+    try {
+      const { apiFetch } = await import('../../db/api.js')
+      const invoices = await apiFetch(`/sales?customer_id=${c.id}`, { fallback: [] })
+      const invs = Array.isArray(invoices) ? invoices.filter(i => i.customer_id === c.id) : []
+      const invoiceCount = invs.length
+      const creditSales = invs.filter(i => i.payment_type === 'credit').reduce((s, i) => s + Number(i.total || 0), 0)
+      const totalSales = invs.reduce((s, i) => s + Number(i.total || 0), 0)
+      const cols = await apiFetch(`/collections?customer_id=${c.id}`, { fallback: [] })
+      const totalCollected = (Array.isArray(cols) ? cols : []).reduce((s, x) => s + Number(x.amount || 0), 0)
+      return { ...c, invoiceCount, totalSales, totalCollected, balance: creditSales - totalCollected, hasSales: invoiceCount > 0 || totalCollected > 0 }
+    } catch { /* تابع بدون بيانات مالية */ }
+  }
   const invoices = await db.salesInvoices.where('customerId').equals(c.id).toArray()
   const invoiceCount = invoices.length
   const creditSales = invoices.filter(i => i.paymentType === 'credit').reduce((s, i) => s + (i.total || 0), 0)
@@ -141,6 +154,14 @@ const totalBalance = computed(() => customers.value.reduce((s, c) => s + Math.ma
 function applySearch() { /* مفعّل عبر v-model */ }
 
 async function loadData() {
+  if (isServer()) {
+    try {
+      const { apiFetch } = await import('../../db/api.js')
+      const rows = await apiFetch('/customers')
+      customers.value = await Promise.all((Array.isArray(rows) ? rows : []).filter(c => c.active === true || c.active === 1 || c.active === 't').map(enrichCustomer))
+      return
+    } catch (e) { formError.value = 'فشل تحميل العملاء من الخادم: ' + (e.message || e); return }
+  }
   const raw = await db.customers.toArray()
   customers.value = await Promise.all(raw.map(enrichCustomer))
 }
@@ -161,16 +182,25 @@ async function saveCustomer() {
     await requirePermission('customers.write', editing.value ? 'تعديل عميل' : 'إضافة عميل')
     const f = { ...form.value }
     if (!f.name.trim()) throw new Error('أدخل اسم العميل')
-    if (!f.code) {
-      const count = await db.customers.count()
-      f.code = 'CUST-' + String(count + 1).padStart(3, '0')
+    if (isServer()) {
+      const { apiFetch } = await import('../../db/api.js')
+      const payload = { name: f.name, phone: f.phone || null, address: f.notes || null, active: true }
+      if (f.code) payload.code = f.code
+      if (f.creditLimit) payload.credit_limit = Number(f.creditLimit)
+      if (editing.value) await apiFetch(`/customers/${editing.value}`, { method: 'PATCH', body: JSON.stringify(payload) })
+      else await apiFetch('/customers', { method: 'POST', body: JSON.stringify(payload) })
+    } else {
+      if (!f.code) {
+        const count = await db.customers.count()
+        f.code = 'CUST-' + String(count + 1).padStart(3, '0')
+      }
+      if (editing.value) await db.customers.update(editing.value, { ...f, updatedAt: Date.now() })
+      else await db.customers.add({ ...f, status: 'active', createdAt: Date.now() })
     }
-    if (editing.value) await db.customers.update(editing.value, { ...f, updatedAt: Date.now() })
-    else await db.customers.add({ ...f, status: 'active', createdAt: Date.now() })
     showForm.value = false
     await loadData()
   } catch (e) {
-    formError.value = e.message
+    formError.value = e.message || e
   } finally {
     saving.value = false
   }
@@ -179,16 +209,21 @@ async function saveCustomer() {
 async function handleDelete(c) {
   try {
     await requirePermission('customers.write', 'حذف عميل')
-    const hasSales = await db.salesInvoices.where('customerId').equals(c.id).count()
-    if (hasSales) {
-      await db.customers.update(c.id, { status: 'inactive', updatedAt: Date.now() })
+    if (isServer()) {
+      const { apiFetch } = await import('../../db/api.js')
+      await apiFetch(`/customers/${c.id}`, { method: 'PATCH', body: JSON.stringify({ active: false }) })
     } else {
-      await db.customers.delete(c.id)
-      await db.collections.where('customerId').equals(c.id).delete()
+      const hasSales = await db.salesInvoices.where('customerId').equals(c.id).count()
+      if (hasSales) {
+        await db.customers.update(c.id, { status: 'inactive', updatedAt: Date.now() })
+      } else {
+        await db.customers.delete(c.id)
+        await db.collections.where('customerId').equals(c.id).delete()
+      }
     }
     await loadData()
   } catch (e) {
-    formError.value = e.message
+    formError.value = e.message || e
   }
 }
 
