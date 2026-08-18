@@ -49,7 +49,10 @@
                         @click.stop="pick(section.menuKey, leaf.page)"
                       >
                         <span class="dropdown-item-label">{{ leaf.label }}</span>
-                        <span v-if="!isImplemented(leaf.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
+                        <span class="dropdown-item-trail">
+                          <svg v-if="child.children" class="dropdown-item-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                          <span v-if="!isImplemented(leaf.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
+                        </span>
                       </button>
                     </template>
                   </template>
@@ -705,67 +708,80 @@ function isImplemented(page) {
 }
 .menu-item.open .menu-arrow { transform: rotate(180deg); }
 
-/* ===== القائمة المنسدلة ===== */
+/* ===== القائمة المنسدلة — تصميم البرامج المحاسبية المكتبية =====
+   قائمة بيضاء ضيقة، كل عنصر بعرض القائمة كاملًا، متراصّة واحدًا تحت الآخر
+   مع أسهم ◂ للعناصر الفرعية وخطوط فاصلة بين المجموعات. */
 .dropdown-panel {
   position: absolute;
   top: 100%;
   left: 0;
-  min-width: 240px;
-  max-width: 300px;
-  max-height: calc(100vh - 60px);
-  background: #fafbfd;
-  border: 1px solid #c9d2de;
-  border-top: 2px solid #b89428;
-  box-shadow: 0 14px 36px rgba(8, 14, 28, 0.45);
+  width: 218px;
+  background: #ffffff;
+  border: 1px solid #a9b4c2;
+  box-shadow: 0 10px 28px rgba(8, 14, 28, 0.35);
   z-index: 120;
   display: flex;
   flex-direction: column;
   direction: rtl;
+  padding: 3px;
 }
 
 .dropdown-scroll {
   overflow-y: auto;
-  padding: 6px 0;
+  padding: 2px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .dropdown-group-title {
-  padding: 6px 16px 2px;
-  font-size: 10.5px;
+  padding: 7px 12px 4px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #7b8699;
-  border-bottom: 1px solid #e8ecf2;
-  margin-bottom: 2px;
+  color: #1c2a42;
+  background: #f4f6f9;
+  border-bottom: 1px solid #cfd8e3;
+}
+.dropdown-group-title.is-report-group {
+  border-top: 2px solid #a9b4c2;
+  margin-top: 4px;
+}
+.dropdown-group-title--nested {
+  background: #ffffff;
+  color: #33455f;
+  padding-right: 24px;
+  font-weight: 600;
 }
 
 .dropdown-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   text-align: right;
-  padding: 8px 16px;
+  padding: 7px 12px;
   background: transparent;
-  color: #22304a;
+  color: #1d2a3d;
   border: none;
   cursor: pointer;
   font-size: 12.5px;
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-family: inherit;
-  transition: background 0.1s ease, color 0.1s ease;
+  line-height: 1.35;
+  transition: background 0.08s ease, color 0.08s ease;
 }
 .dropdown-item:hover {
-  background: #f1ead7;
-  color: #6b5a15;
+  background: #c9d8f0;
+  color: #0d1b33;
 }
 .dropdown-item.active {
-  background: #e8dfc2;
-  color: #4a3f0e;
+  background: #aebfdc;
+  color: #0d1b33;
   font-weight: 700;
 }
 .dropdown-item.pending {
-  color: #8a7a52;
+  color: #6a7688;
 }
 .dropdown-item.nested {
   padding-right: 24px;
@@ -775,16 +791,30 @@ function isImplemented(page) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dropdown-item-arrow {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  opacity: 0.75;
+  color: inherit;
+}
+.dropdown-item-trail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 .dropdown-item-badge {
-  margin-inline-start: 8px;
+  margin-inline-start: 4px;
   padding: 1px 6px;
-  border-radius: 999px;
-  background: #f3ead6;
-  border: 1px solid #d9c994;
-  color: #8a6f22;
+  border-radius: 2px;
+  background: #eef0f4;
+  border: 1px solid #c9d2de;
+  color: #6a7688;
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ===== رسالة الشاشات قيد التطوير ===== */
