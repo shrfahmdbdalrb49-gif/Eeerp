@@ -241,7 +241,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
     await conn.query("UPDATE sales_invoices SET status = 'final' WHERE id = $1", [id])
     await conn.query('COMMIT')
     await auditLog(req, 'sale.post', 'sale', id)
-    res.json({ ok: true, entry_no: entryNo })
+    res.json({ ok: true, entry_no: entryNo, batch_marker: 'v80b' })
   } catch (err) {
     await conn.query('ROLLBACK').catch(() => {})
     next(err)
