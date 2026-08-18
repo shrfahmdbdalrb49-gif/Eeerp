@@ -46,13 +46,15 @@ router.post('/', requireAuth, requirePermission('items.write'), async (req, res,
     }
     const rows = await query(
       `INSERT INTO items (code, barcode, name, name_en, unit, category, purchase_unit_cost,
-       sale_price, min_stock, taxable, tax_rate, profit_account_id, purchase_account_id, inventory_account_id, cogs_account_id, active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true) RETURNING *`,
+       sale_price, min_stock, taxable, tax_rate, profit_account_id, purchase_account_id, inventory_account_id, cogs_account_id,
+       preferred_supplier_id, active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true) RETURNING *`,
       [f.code || null, barcode, f.name, f.name_en || null, f.unit || 'حبة', f.category || null,
        Number(f.purchase_unit_cost || 0), Number(f.sale_price || 0), Number(f.min_stock || 0),
        !!f.taxable, Number(f.tax_rate || 0), f.profit_account_id ? Number(f.profit_account_id) : null,
        f.purchase_account_id ? Number(f.purchase_account_id) : null, f.inventory_account_id ? Number(f.inventory_account_id) : null,
-       f.cogs_account_id ? Number(f.cogs_account_id) : null],
+       f.cogs_account_id ? Number(f.cogs_account_id) : null,
+       f.preferred_supplier_id ? Number(f.preferred_supplier_id) : null],
     )
     await auditLog(req, 'item.create', 'item', rows[0].id, { name: f.name })
     res.status(201).json(rows[0])
@@ -69,7 +71,7 @@ router.patch('/:id', requireAuth, requirePermission('items.write'), async (req, 
                        'sale_price', 'min_stock', 'taxable', 'tax_rate', 'active']) {
       if (f[key] !== undefined) { parts.push(`${key} = $${i++}`); values.push(f[key]) }
     }
-    for (const key of ['profit_account_id', 'purchase_account_id', 'inventory_account_id', 'cogs_account_id']) {
+    for (const key of ['profit_account_id', 'purchase_account_id', 'inventory_account_id', 'cogs_account_id', 'preferred_supplier_id']) {
       if (f[key] !== undefined) { parts.push(`${key} = $${i++}`); values.push(f[key] != null ? Number(f[key]) : null) }
     }
     if (!parts.length) return res.status(400).json({ error: 'لا توجد بيانات للتعديل' })

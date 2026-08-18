@@ -130,3 +130,10 @@ DO $$ BEGIN
     ALTER TABLE suppliers ADD COLUMN name text;
   END IF;
 END $$;
+
+-- items: ربط الصنف بالمورد الرئيسي (المورد المفضل)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'items' AND column_name = 'preferred_supplier_id') THEN
+    ALTER TABLE items ADD COLUMN preferred_supplier_id int REFERENCES suppliers(id) ON DELETE SET NULL;
+  END IF;
+END $$;

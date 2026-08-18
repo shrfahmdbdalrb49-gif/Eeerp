@@ -137,6 +137,13 @@
             <label>يحتاج وصفة؟</label>
             <select class="fi" v-model="form.prescription"><option :value="false">لا</option><option :value="true">نعم</option></select>
           </div>
+          <div class="field-card" style="flex:1.4">
+            <label>المورد المرتبط بالصنف</label>
+            <select class="fi" v-model.number="form.supplierId">
+              <option :value="0">— بدون توريد —</option>
+              <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
         </div>
         <div v-if="formError" class="form-msg form-msg-error">{{ formError }}</div>
         <div class="form-actions-row">
@@ -168,7 +175,8 @@ const editing = ref(null)
 const saving = ref(false)
 const formError = ref('')
 const units = ['علبة', 'شريط', 'حبة', 'زجاجة', 'أمبولة', 'قطارة', 'أنبوب', 'ربطة', 'كيس', 'قطعة']
-const form = ref({ code: '', name: '', scientific: '', category: '', unit: 'علبة', barcode: '', sellPrice: 0, costPrice: 0, minStock: 0, prescription: false })
+const suppliers = ref([])
+const form = ref({ code: '', name: '', scientific: '', category: '', unit: 'علبة', barcode: '', sellPrice: 0, costPrice: 0, minStock: 0, prescription: false, supplierId: 0 })
 
 const enriched = computed(() => items.value.map(it => ({
   ...it,
@@ -206,12 +214,14 @@ async function loadData() {
   if (isServer()) {
     try {
       const { apiFetch } = await import('../../db/api.js')
-      const rows = await apiFetch('/items')
+      const [rows, suppRows] = await Promise.all([apiFetch('/items'), apiFetch('/suppliers')])
+      suppliers.value = (Array.isArray(suppRows) ? suppRows : []).filter(s => s.active !== false && s.active !== 0 && s.active !== 'f').map(s => ({ id: s.id, name: s.name }))
       items.value = (Array.isArray(rows) ? rows : []).map(it => ({
         id: it.id, code: it.code, name: it.name, scientific: it.name_en || '',
         category: it.category, unit: it.unit || 'حبة', barcode: it.barcode || '',
         sellPrice: Number(it.sale_price || 0), costPrice: Number(it.purchase_unit_cost || 0),
         minStock: Number(it.min_stock || 0), prescription: !!it.prescription,
+        supplierId: it.preferred_supplier_id || 0,
         active: it.active === true || it.active === 1 || it.active === 't' ? 1 : 0,
       }))
       /* المخزون يُحسب من حركات المخزون الفعلية وليس من جدول الدُفعات اليدوي */
@@ -249,8 +259,8 @@ function openForm(it) {
   editing.value = it ? it.id : null
   formError.value = ''
   form.value = it
-    ? { code: it.code, name: it.name, scientific: it.scientific || '', category: it.category || '', unit: it.unit || 'علبة', barcode: it.barcode || '', sellPrice: it.sellPrice || 0, costPrice: it.costPrice || 0, minStock: it.minStock || 0, prescription: !!it.prescription }
-    : { code: '', name: '', scientific: '', category: '', unit: 'علبة', barcode: '', sellPrice: 0, costPrice: 0, minStock: 0, prescription: false }
+    ? { code: it.code, name: it.name, scientific: it.scientific || '', category: it.category || '', unit: it.unit || 'علبة', barcode: it.barcode || '', sellPrice: it.sellPrice || 0, costPrice: it.costPrice || 0, minStock: it.minStock || 0, prescription: !!it.prescription, supplierId: it.supplierId || 0 }
+    : { code: '', name: '', scientific: '', category: '', unit: 'علبة', barcode: '', sellPrice: 0, costPrice: 0, minStock: 0, prescription: false, supplierId: 0 }
   showForm.value = true
 }
 
@@ -263,17 +273,20 @@ async function saveItem() {
     if (!f.name.trim()) throw new Error('أدخل اسم الصنف')
     if (isServer()) {
       const { apiFetch } = await import('../../db/api.js')
+      const supp = Number(f.supplierId) > 0 ? Number(f.supplierId) : null
       if (editing.value) {
         await apiFetch(`/items/${editing.value}`, { method: 'PATCH', body: JSON.stringify({
           name: f.name, name_en: f.scientific || null, unit: f.unit, category: f.category || null,
           barcode: f.barcode || null, sale_price: Number(f.sellPrice || 0),
           purchase_unit_cost: Number(f.costPrice || 0), min_stock: Number(f.minStock || 0), active: true,
+          preferredSupplierId: supp,
         }) })
       } else {
         await apiFetch('/items', { method: 'POST', body: JSON.stringify({
           name: f.name, name_en: f.scientific || null, unit: f.unit, category: f.category || null,
           barcode: f.barcode || null, sale_price: Number(f.sellPrice || 0),
           purchase_unit_cost: Number(f.costPrice || 0), min_stock: Number(f.minStock || 0),
+          preferredSupplierId: supp,
         }) })
       }
     } else {

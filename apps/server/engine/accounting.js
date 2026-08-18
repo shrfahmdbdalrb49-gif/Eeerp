@@ -246,7 +246,8 @@ export async function itemMovements(conn, from, to, storeId) {
   if (storeId) { params.push(Number(storeId)); cond.push(`sm.store_id = $${params.length}`) }
   const where = cond.length ? `WHERE ${cond.join(' AND ')}` : ''
   const rows = await conn.query(`
-    SELECT sm.item_id, i.name AS item_name, i.barcode, i.unit,
+    SELECT sm.item_id, i.name AS item_name, i.barcode, i.unit, i.preferred_supplier_id,
+           (SELECT s.name FROM suppliers s WHERE s.id = i.preferred_supplier_id) AS supplier_name,
            COALESCE(SUM(CASE WHEN sm.movement_type='in' THEN sm.quantity ELSE 0 END),0)::numeric(18,3) AS qty_in,
            COALESCE(SUM(CASE WHEN sm.movement_type='out' THEN ABS(sm.quantity) ELSE 0 END),0)::numeric(18,3) AS qty_out,
            COALESCE(SUM(sm.quantity),0)::numeric(18,3) AS qty_net,
@@ -254,7 +255,7 @@ export async function itemMovements(conn, from, to, storeId) {
     FROM stock_movements sm
     JOIN items i ON i.id = sm.item_id
     ${where}
-    GROUP BY sm.item_id, i.name, i.barcode, i.unit
+    GROUP BY sm.item_id, i.name, i.barcode, i.unit, i.preferred_supplier_id
     ORDER BY i.name
   `, params)
   return rows.rows

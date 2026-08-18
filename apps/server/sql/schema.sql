@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS items (
   purchase_account_id int REFERENCES chart_of_accounts(id),
   inventory_account_id int REFERENCES chart_of_accounts(id),
   cogs_account_id int REFERENCES chart_of_accounts(id),
+  preferred_supplier_id int REFERENCES suppliers(id) ON DELETE SET NULL,
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );

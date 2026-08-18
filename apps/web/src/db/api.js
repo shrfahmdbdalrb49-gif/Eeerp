@@ -43,7 +43,7 @@ function saveAuth(auth) {
    ============================================ */
 const CAMEL2SNAKE_MAP = {
   // رؤوس الفواتير والمعاملات
-  customerId: 'customer_id', supplierId: 'supplier_id',
+  customerId: 'customer_id', supplierId: 'supplier_id', preferredSupplierId: 'preferred_supplier_id',
   invoiceDate: 'invoice_date', purchaseDate: 'purchase_date', invoiceTime: 'invoice_time',
   paymentType: 'payment_type', paymentMethod: 'payment_method', paidAmount: 'paid_amount',
   remainingAmount: 'remaining_amount', totalAmount: 'total_amount',

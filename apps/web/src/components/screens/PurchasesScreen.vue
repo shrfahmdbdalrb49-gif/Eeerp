@@ -410,6 +410,17 @@ function removeLine(i) { if (form.value.lines.length > 1) form.value.lines.splic
 function onItemSelect(i) {
   const it = itemOf(form.value.lines[i].itemId)
   if (it) form.value.lines[i].cost = it.cost || it.purchasePrice || 0
+  /* المورد المفضل للصنف (قد يكون مخزّنًا بـ preferred_supplier_id من API أو supplierId محليًا) */
+  const prefSup = it?.preferred_supplier_id || it?.supplierId || null
+  /* اقتراح المورد المفضل للصنف: إذا لم يُختر مورد بعد وربط الصنف بمورد، يُختار تلقائيًا */
+  if (it && prefSup && !form.value.supplierId) {
+    form.value.supplierId = prefSup
+    flash('تم اختيار المورد المرتبط بالصنف تلقائيًا: ' + supplierName(prefSup), 'ok')
+  }
+  /* تنبيه إذا اختير صنف مورده المفضل يختلف عن المورد المختار في الفاتورة */
+  if (it && prefSup && form.value.supplierId && form.value.supplierId !== prefSup) {
+    flash('تنبيه: المورد المفضل لهذا الصنف هو «' + suppliers.value.find(s => s.id === prefSup)?.name + '» — اخترت موردًا آخر', 'warn')
+  }
 }
 function focusSupplier() { /* البحث عن مورد عبر فلاتر رأس المستند */ }
 function addQuickItem() {
