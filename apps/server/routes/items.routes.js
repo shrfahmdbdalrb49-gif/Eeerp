@@ -118,6 +118,23 @@ router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (re
   }
 })
 
+/* DEBUG: ينفذ نفس استعلام stock ويعيد الخطأ كنص أو النتيجة */
+router.get('/debug/stock/:id', requireAuth, async (req, res, next) => {
+  try {
+    const r1 = await query(
+      `SELECT b.id AS batch_id, b.batch_no FROM batches b WHERE b.item_id = $1`, [Number(req.params.id)])
+    const r2 = await query(
+      `SELECT COALESCE(SUM(sm.quantity),0) AS q FROM stock_movements sm WHERE sm.item_id = $1`, [Number(req.params.id)])
+    const r3 = await query(
+      `SELECT b.id AS batch_id, COALESCE(SUM(sm.quantity),0) AS quantity
+       FROM batches b LEFT JOIN stock_movements sm ON sm.batch_id = b.id
+       WHERE b.item_id = $1 GROUP BY b.id ORDER BY b.id`, [Number(req.params.id)])
+    res.json({ build: 'v80', r1, r2, r3 })
+  } catch (err) {
+    res.json({ build: 'v80', error: String(err?.message || err), stack: String(err?.stack || '').split('\n').slice(0, 6) })
+  }
+})
+
 /* DEBUG v79d: يعرض جميع حركات المخزون للصنف لتشخيص batch mismatch */
 router.get('/:id/mov', requireAuth, requirePermission('items.read'), async (req, res, next) => {
   try {
