@@ -5,8 +5,9 @@
    - 'server' : الخادم المركزي PostgreSQL + JWT
    يمكن التبديل لاحقًا عبر الإعدادات دون إعادة بناء.
    ============================================ */
-/* الافتراضي 'local': لا خادم تشغيلي حاليًا؛ وضع الخادم يُفعّل فقط بمتغير بيئة صريح */
-let STORAGE_MODE = import.meta.env.VITE_STORAGE_MODE || 'local'
+/* الافتراضي 'server': النظام منشور بالكامل على Railway (خادم + PostgreSQL).
+   وضع الاستعراض المحلي يُفعّل يدويًا فقط (?demo=1 أو الإعدادات). */
+let STORAGE_MODE = import.meta.env.VITE_STORAGE_MODE || 'server'
 
 export function getStorageMode() {
   return STORAGE_MODE
@@ -19,21 +20,24 @@ export function setStorageMode(mode) {
   }
 }
 
-/* قراءة النمط المفضّل المحفوظ محليًا (إن وُجد) */
+/* قراءة النمط المفضّل المحفوظ محليًا (إن وُجد)
+   ملاحظة: لا نستعمل القيمة المحفوظة إذا كانت 'local' والنمط الافتراضي 'server'،
+   لأن تحويل demoMode القديم إلى local ترك قيمة محفوظة في أجهزة المستخدمين
+   وتسبب بفتح النظام على IndexedDB فارغ بدل الخادم المركزي. */
 try {
   const saved = localStorage.getItem('sharaf-storage-mode')
-  if (saved === 'local' || saved === 'server') STORAGE_MODE = saved
+  const defaultMode = String(import.meta.env.VITE_STORAGE_MODE || 'server')
+  if ((saved === 'local' || saved === 'server') && saved === defaultMode) STORAGE_MODE = saved
 } catch {}
 
-/* إصلاح «محتوى مختلط» (Mixed Content): عند نشر النظام على GitHub Pages (https) فإن محاولة
-   الاتصال بخادم على localhost (http) تُرفض من المتصفح فورًا بخطأ «Failed to fetch».
-   في هذه الحالة لا معنى لوضع الخادم، فنتحول تلقائيًا إلى التخزين المحلي. */
+/* إصلاح «محتوى مختلط» (Mixed Content): عند اتصال صفحة آمنة (https) بخادم localhost غير آمن،
+   لا نحوّل النمط تلقائيًا بل نكتفي بإصلاح عنوان الخادم إلى النطاق الآمن نفسه (same-origin)
+   لأن الخادم يعمل الآن على نفس النطاق. */
 try {
   const securePage = location.protocol === 'https:'
   const triesLocalhost = (import.meta.env.VITE_API_BASE || 'localhost:4000').includes('localhost')
-  if (securePage && triesLocalhost && STORAGE_MODE === 'server') {
-    STORAGE_MODE = 'local'
-    try { localStorage.setItem('sharaf-storage-mode', 'local') } catch {}
+  if (securePage && triesLocalhost) {
+    try { window.API_BASE = location.origin + '/api' } catch {}
   }
 } catch {}
 

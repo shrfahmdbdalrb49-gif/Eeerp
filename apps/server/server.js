@@ -34,8 +34,8 @@ const PORT = process.env.PORT || 4000
 app.use(cors({ origin: true, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 
-app.get('/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v95', ts: new Date().toISOString() }))
-app.get('/api/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v95', ts: new Date().toISOString() }))
+app.get('/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v96', ts: new Date().toISOString() }))
+app.get('/api/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v96', ts: new Date().toISOString() }))
 
 /* جميع نقاط API تحت /api */
 app.use('/api/auth', authRoutes)

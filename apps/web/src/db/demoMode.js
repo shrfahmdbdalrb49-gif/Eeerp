@@ -39,14 +39,11 @@ export async function ensureDemoMode() {
     }
   } catch {}
 
-  if (getStorageMode() === 'server') {
-    const reachable = await serverReachable(5000)
-    if (!reachable) {
-      /* الخادم غير متاح (مثل النشر على GitHub Pages) → التحويل محليًا */
-      console.info('[SharafERP] الخادم غير متاح — التشغيل في وضع الاستعراض المحلي (IndexedDB)')
-      setStorageMode('local')
-    }
-  }
+  /* لا نحوّل إلى الوضع المحلي تلقائيًا عند فشل فحص الخادم:
+     النظام الآن منشور بالكامل على Railway (خادم + قاعدة بيانات)،
+     والتحويل الصامت إلى IndexedDB كان يسبب ظهور «0 فواتير» و«مستخدم غير موجود»
+     لأن الجلسة الجديدة تفتح على قاعدة فارغة محليًا.
+     الوضع المحلي يُفعّل فقط يدويًا عبر ?demo=1 أو localStorage. */
   return getStorageMode()
 }
 
