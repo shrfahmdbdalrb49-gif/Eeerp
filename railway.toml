@@ -1,11 +1,9 @@
 [build]
 builder = "RAILPACK"
 rootDirectory = "."
-watchPatterns = ["apps/server/**", "package.json"]
-
+watchPatterns = ["apps/server/**", "apps/web/**", "package.json", "railway.toml"]
 [build.packages]
 nodejs = "22"
-
 [deploy]
 startCommand = "node apps/server/server.js"
 healthcheckPath = "/api/health"
