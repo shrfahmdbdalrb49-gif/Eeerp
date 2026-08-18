@@ -234,7 +234,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
           `INSERT INTO stock_movements (item_id, batch_id, store_id, movement_type, quantity, unit_cost,
              ref_kind, ref_id, created_by)
            VALUES ($1,$2,$3,'out',-($4::numeric),$5,'sale',$6,$7)`,
-          [l.item_id, batchSel || target.rows[0].batch_id, s.store_id, take, Number(l.cost_at_sale || 0), id, req.user.id],
+          [l.item_id, Number(target.rows[0].batch_id) || null, s.store_id, take, Number(l.cost_at_sale || 0), id, req.user.id],
         )
       }
     }
@@ -334,11 +334,19 @@ router.post('/returns/:id/post', requireAuth, requirePermission('sales.create'),
     for (const l of lines.rows) {
       const item = await conn.query('SELECT * FROM items WHERE id = $1', [l.item_id])
       if (!item.rows[0]) continue
+      /* المرتجع يستعيد الكمية إلى الدفعة الأحدث المتاحة (الأقدم أولًا FIFO عكسي) */
+      const restBatch = await conn.query(
+        `SELECT batch_id FROM stock_movements
+         WHERE item_id = $1 AND (store_id IS NOT DISTINCT FROM $2)
+           AND movement_type = 'in' AND quantity - reserved_quantity > 0
+         ORDER BY created_at DESC LIMIT 1`,
+        [l.item_id, r.store_id],
+      )
       await conn.query(
         `INSERT INTO stock_movements (item_id, batch_id, store_id, movement_type, quantity, unit_cost,
            ref_kind, ref_id, created_by)
-         VALUES ($1,NULL,$2,'in',$3,$4,'sale_return',$5,$6)`,
-        [l.item_id, r.store_id, Number(l.quantity || 0), Number(l.unit_price || 0), id, req.user.id],
+         VALUES ($1,$2,$3,'in',$4,$5,'sale_return',$6,$7)`,
+        [l.item_id, restBatch.rows[0]?.batch_id || null, r.store_id, Number(l.quantity || 0), Number(l.unit_price || 0), id, req.user.id],
       )
     }
     await conn.query("UPDATE sales_returns SET status = 'final' WHERE id = $1", [id])
