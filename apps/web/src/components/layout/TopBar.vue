@@ -19,6 +19,7 @@
             tabindex="0"
             :class="{ open: openMenu === section.menuKey }"
             @click="toggleMenu(section.menuKey)"
+            @touchend.prevent.stop="toggleMenu(section.menuKey)"
             @keydown.enter.space.prevent="toggleMenu(section.menuKey)"
           >
             <span class="menu-label">{{ section.title }}</span>
@@ -488,14 +489,22 @@ function pick(sectionKey, page) {
   emit('select', page)
 }
 
+let pointerStartedInTopBar = false
+function onGlobalPointerDown(e) {
+  // يسجّل بداية اللمس/النقر: هل بدأت من داخل الشريط العلوي؟
+  pointerStartedInTopBar = !!(e && e.target && e.target.closest && e.target.closest('.top-bar'))
+}
 function onDocClick(e) {
-  if (e && e.target && e.target.closest('.top-bar')) return
+  // الإغلاق فقط إذا بدأ النقر من خارج الشريط العلوي — يمنع إغلاقًا خاطئًا على اللمس
+  if (pointerStartedInTopBar) return
+  if (e && e.target && e.target.closest && e.target.closest('.top-bar')) return
   if (!keepOpen.value) openMenu.value = null
   keepOpen.value = false
 }
 
 let timer = null
 onMounted(() => {
+  document.addEventListener('pointerdown', onGlobalPointerDown, true)
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', globalShortcut)
   timer = setInterval(() => {
@@ -503,6 +512,7 @@ onMounted(() => {
   }, 30_000)
 })
 onUnmounted(() => {
+  document.removeEventListener('pointerdown', onGlobalPointerDown, true)
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', globalShortcut)
   if (timer) clearInterval(timer)
