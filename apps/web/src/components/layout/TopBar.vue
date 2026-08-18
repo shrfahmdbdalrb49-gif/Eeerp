@@ -9,7 +9,7 @@
     </div>
 
     <!-- قائمة الأقسام الأفقية -->
-    <nav class="menu-bar" role="menubar" aria-label="القائمة الرئيسية">
+    <nav class="menu-bar" role="menubar" aria-label="القائمة الرئيسية" @mouseleave="onBarLeave">
       <template v-for="section in allSections" :key="section.key">
         <div class="menu-wrapper" @mouseenter="onHover(section.menuKey)">
           <button
@@ -471,14 +471,25 @@ const openMenu = ref(null)
 const keepOpen = ref(false)
 
 function toggleMenu(key) {
-  openMenu.value = openMenu.value === key ? null : key
-}
-
-function onHover(key) {
-  if (openMenu.value && openMenu.value !== key) {
+  // النقر على قسم مغلق يفتحه فورًا — النقر على قسم مفتوح يغلقه
+  if (openMenu.value === key) {
+    openMenu.value = null
+  } else {
     openMenu.value = key
     keepOpen.value = false
   }
+}
+
+/**
+ * التمرير بالفأرة فوق أي قسم: فتح قائمته فورًا (سلوك سطح المكتب)
+ * — مضمون الظهور حتى لو لم تكن أي قائمة مفتوحة سابقًا.
+ */
+let lastHoverKey = null
+function onHover(key) {
+  if (lastHoverKey === key) return
+  lastHoverKey = key
+  openMenu.value = key
+  keepOpen.value = false
 }
 
 function pick(sectionKey, page) {
@@ -516,6 +527,11 @@ function onDocClick(e) {
   if (e && e.target && e.target.closest && e.target.closest('.top-bar')) return
   if (!keepOpen.value) openMenu.value = null
   keepOpen.value = false
+}
+
+/** إغلاق القائمة عند مغادرة الشريط العلوي بالكامل بالفأرة (سلوك سطح المكتب) */
+function onBarLeave() {
+  if (!keepOpen.value) openMenu.value = null
 }
 
 let timer = null
