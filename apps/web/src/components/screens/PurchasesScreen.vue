@@ -368,15 +368,22 @@ async function loadData() {
       if (filters.value.dateFrom) qs.set('dateFrom', filters.value.dateFrom)
       if (filters.value.dateTo) qs.set('dateTo', filters.value.dateTo)
       const raw = await apiFetch('/purchases?' + qs.toString())
-      const lines = await apiFetch('/purchases-lines', { fallback: [] })
+      const lines = await apiFetch('/purchases/lines', { fallback: [] })
       invoices.value = (Array.isArray(raw) ? raw : []).map(inv => {
-        const ils = (Array.isArray(lines) ? lines : []).filter(l => l.invoice_id === inv.id)
+        const ils = (Array.isArray(lines) ? lines : []).filter(l => l.purchase_id === inv.id)
+        const lineTotal = (l) => {
+          if (l.line_total != null) return Number(l.line_total)
+          return Number(l.quantity || 0) * Number(l.unit_cost || 0)
+        }
         return {
-          ...inv, id: inv.id, supplierId: inv.supplier_id, date: String(inv.invoice_date || '').slice(0, 10),
-          status: inv.status, paymentType: inv.payment_type, invoice_no: inv.invoice_no,
+          ...inv, id: inv.id, supplierId: inv.supplier_id, date: String(inv.purchase_date || inv.invoice_date || '').slice(0, 10),
+          status: inv.status, paymentType: inv.payment_method || inv.payment_type,
+          invoice_no: inv.purchase_no || inv.invoice_no,
+          totalAmount: inv.total_amount != null ? Number(inv.total_amount) : null,
+          paidAmount: inv.paid_amount != null ? Number(inv.paid_amount) : null,
           linesCount: ils.length,
-          totalQty: ils.reduce((s, l) => s + (l.qty || 0) + (l.bonus || 0), 0),
-          total: ils.reduce((s, l) => s + Number(l.subtotal || 0), 0),
+          totalQty: ils.reduce((s, l) => s + Number(l.quantity || 0) + Number(l.bonus_quantity || 0), 0),
+          total: ils.reduce((s, l) => s + lineTotal(l), 0),
         }
       })
     } catch (e) {
