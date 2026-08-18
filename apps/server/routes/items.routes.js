@@ -92,11 +92,8 @@ router.delete('/:id', requireAuth, requirePermission('items.write'), async (req,
 })
 
 router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (req, res, next) => {
-  const conn = await getPool().connect()
   try {
-    const item = await conn.query(`SELECT id, name FROM items WHERE id = $1`, [Number(req.params.id)])
-    if (!item.rows[0]) return res.status(404).json({ error: 'الصنف غير موجود' })
-    const rows = await conn.query(
+    const rows = await query(
       `SELECT b.id AS batch_id, b.batch_no, b.expiry_date, b.cost_per_unit AS cost,
               COALESCE(SUM(sm.quantity),0) AS quantity,
               COALESCE(SUM(sm.reserved_quantity),0) AS reserved,
@@ -107,9 +104,21 @@ router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (re
        GROUP BY b.id ORDER BY b.expiry_date`,
       [Number(req.params.id)],
     )
-    res.json({ build: 'v79c', batches: rows.rows })
+    res.json(rows)
   } catch (err) { next(err) }
-  finally { conn.release() }
+})
+
+/* DEBUG v79d: يعرض جميع حركات المخزون للصنف لتشخيص batch mismatch */
+router.get('/:id/mov', requireAuth, requirePermission('items.read'), async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT id, batch_id, movement_type, quantity, reserved_quantity, unit_cost,
+              item_id, store_id, ref_kind, ref_id, created_at
+       FROM stock_movements WHERE item_id = $1 ORDER BY id`,
+      [Number(req.params.id)],
+    )
+    res.json(rows)
+  } catch (err) { next(err) }
 })
 
 export default router
