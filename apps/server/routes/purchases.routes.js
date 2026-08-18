@@ -117,13 +117,12 @@ router.post('/:id/post', requireAuth, requirePermission('purchases.post'), async
     const entryNo = await nextEntryNo(conn)
     const jeLines = []
     let totalDebitInventory = 0
-    /* المورد (دائن) — خارج الحلقة حتى يتاح للدفعة الفورية أيضًا */
-    const acctsForSupplier = await acctIds(conn)
-    const supAcct = Number(p.supplier_account_id) || acctsForSupplier.supplier_ap
+    /* حسابات النظام الأساسية — تُجلب مرة واحدة لتقليل استدعاءات قاعدة البيانات */
+    const ids0 = await acctIds(conn)
+    const supAcct = Number(p.supplier_account_id) || ids0.supplier_ap
     for (const l of lines.rows) {
       /* المخزون (مدين) */
-      const ids = await acctIds(conn)
-      const invAcct = Number(itemMap.get(l.item_id)?.inventory_account_id) || ids.inventory
+      const invAcct = Number(itemMap.get(l.item_id)?.inventory_account_id) || ids0.inventory
       totalDebitInventory += Number(l.line_total || 0)
       /* المورد (دائن) — معرف خارج الحلقة */
       jeLines.push({ account_id: invAcct, description: `مشتريات: ${p.purchase_no} - ${itemMap.get(l.item_id)?.name}`, debit: Number(l.line_total || 0), credit: 0 })
@@ -131,9 +130,8 @@ router.post('/:id/post', requireAuth, requirePermission('purchases.post'), async
     }
     /* لو كان هناك دفع فوري من الصندوق */
     if (Number(p.paid_amount) > 0) {
-      const ids2 = await acctIds(conn)
       jeLines.push({ account_id: supAcct, description: `دفعة مقدمة - ${p.purchase_no}`, debit: Number(p.paid_amount), credit: 0 })
-      jeLines.push({ account_id: Number(p.cash_account_id) || ids2.cash, description: `دفعة من الصندوق - ${p.purchase_no}`, debit: 0, credit: Number(p.paid_amount) })
+      jeLines.push({ account_id: Number(p.cash_account_id) || ids0.cash, description: `دفعة من الصندوق - ${p.purchase_no}`, debit: 0, credit: Number(p.paid_amount) })
     }
     await insertJournalEntry(conn, {
       entryNo, entryDate: p.purchase_date,
