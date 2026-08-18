@@ -38,44 +38,20 @@
             >
               <div class="dropdown-scroll">
                 <template v-for="group in section.groups" :key="group.title">
-                  <div v-if="group.title" class="dropdown-group-title">{{ group.title }}</div>
+                  <div v-if="group.title" :class="['dropdown-group-title', { 'is-report-group': /^تقارير/.test(group.title) }]">{{ group.title }}</div>
                   <template v-for="child in group.children" :key="child.title ?? child.page">
-                    <div v-if="child.children" class="dropdown-subgroup">
+                    <div v-if="child.children" class="dropdown-group-title dropdown-group-title--nested">{{ child.title }}</div>
+                    <template v-for="leaf in (child.children || [child])" :key="leaf.page">
                       <button
                         type="button"
-                        class="dropdown-subtitle"
-                        @click.stop="toggleSub(section.menuKey, child.title)"
+                        class="dropdown-item"
+                        :class="{ active: activePage === leaf.page, pending: !isImplemented(leaf.page), nested: !!child.children }"
+                        @click.stop="pick(section.menuKey, leaf.page)"
                       >
-                        <span>{{ child.title }}</span>
-                        <svg class="dropdown-sub-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="m9 18 6-6-6-6" />
-                        </svg>
+                        <span class="dropdown-item-label">{{ leaf.label }}</span>
+                        <span v-if="!isImplemented(leaf.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
                       </button>
-                      <transition name="sub-open">
-                        <div v-show="expandedSub[child.title]" class="dropdown-subchildren">
-                          <button
-                            v-for="leaf in child.children"
-                            :key="leaf.page"
-                            type="button"
-                            class="dropdown-item"
-                            :class="{ active: activePage === leaf.page }"
-                            @click.stop="pick(section.menuKey, leaf.page)"
-                          >
-                            {{ leaf.label }}
-                          </button>
-                        </div>
-                      </transition>
-                    </div>
-                    <button
-                      v-else
-                      type="button"
-                      class="dropdown-item"
-                      :class="{ active: activePage === child.page, pending: !isImplemented(child.page) }"
-                      @click.stop="pick(section.menuKey, child.page)"
-                    >
-                      <span class="dropdown-item-label">{{ child.label }}</span>
-                      <span v-if="!isImplemented(child.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
-                    </button>
+                    </template>
                   </template>
                 </template>
               </div>
@@ -493,7 +469,6 @@ const allSections = [
 // ===== القائمة المنسدلة =====
 const openMenu = ref(null)
 const keepOpen = ref(false)
-const expandedSub = ref({})
 
 function toggleMenu(key) {
   openMenu.value = openMenu.value === key ? null : key
@@ -504,10 +479,6 @@ function onHover(key) {
     openMenu.value = key
     keepOpen.value = false
   }
-}
-
-function toggleSub(sectionKey, title) {
-  expandedSub.value = { ...expandedSub.value, [title]: !expandedSub.value[title] }
 }
 
 function pick(sectionKey, page) {
@@ -780,6 +751,9 @@ function isImplemented(page) {
 .dropdown-item.pending {
   color: #8a7a52;
 }
+.dropdown-item.nested {
+  padding-right: 24px;
+}
 .dropdown-item-label {
   white-space: nowrap;
   overflow: hidden;
@@ -841,34 +815,16 @@ function isImplemented(page) {
   transform: translateX(-50%) translateY(-6px);
 }
 
-.dropdown-subtitle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 16px;
-  background: transparent;
-  color: #3a4760;
-  border: none;
-  cursor: pointer;
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  font-family: inherit;
-  transition: background 0.1s ease;
+/* فاصل أفقي ───── قبل مجموعات التقارير، مثل الصورة المرجعية */
+.dropdown-group-title--nested {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #c9d2de;
 }
-.dropdown-subtitle:hover { background: #f4f6fa; }
-
-.dropdown-sub-arrow {
-  width: 12px;
-  height: 12px;
-  opacity: 0.6;
-  transition: transform 0.15s ease;
-}
-.dropdown-subchildren {
-  padding: 2px 0 2px 10px;
-  margin-right: 10px;
-  border-right: 2px solid #dde3ec;
+.dropdown-group-title.is-report-group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #c9d2de;
 }
 
 /* ===== أدوات الشريط: البحث + المستخدم ===== */

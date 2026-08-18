@@ -34,7 +34,7 @@ export async function login(username, password) {
       const netErr = !e.status && /fetch|network|mixed content/i.test(e.message || '')
       /* النظام سحابي بالكامل الآن — لا نتحول تلقائيًا إلى الوضع المحلي،
          لأن ذلك كان يعلق الأجهزة في قاعدة IndexedDB قديمة تعرض
-         «مستخدم غير موجود أو معطّل». عند فشل الاتصال نعرض رسالة واضحة.
+         «مستخدم غير موجود أو معطل». عند فشل الاتصال نعرض رسالة واضحة.
          كملاذ أخير: إذا كان الجهاز قد عُلق سابقًا في وضع local،
          نمسح قاعدة IndexedDB القديمة ونعيد المحاولة مرة واحدة. */
       if (netErr && getStorageMode() === 'local') {
@@ -47,6 +47,31 @@ export async function login(username, password) {
         return { ok: true, user: r.user }
       }
       return { ok: false, error: netErr ? 'تعذّر الاتصال بالخادم - تحقّق من الإنترنت وحاول مرة أخرى' : (e.message || 'خطأ في المصادقة') }
+    }
+  }
+
+  /* ===== حماية ضد التعثر في الوضع المحلي القديم =====
+     الرسالة «مستخدم غير موجود أو معطَّل» تظهر فقط في وضع IndexedDB المحلي.
+     النظام سحابي بالكامل؛ إذا حاول المستخدم الدخول وهو في وضع محلي قديم
+     ولم توجد قاعدة محلية بها حسابه، نعيد التوجيه تلقائيًا إلى الخادم
+     المركزي ونحاول مرة واحدة بدلًا من إرباكه بالرسالة القديمة. */
+  const savedApiBase = typeof localStorage !== 'undefined' ? localStorage.getItem('sharaf-api-base') : null
+  const savedMode = typeof localStorage !== 'undefined' ? localStorage.getItem('sharaf-storage-mode') : null
+  const looksLegacy = savedMode === 'local' || Boolean(savedApiBase)
+  const netBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) || ''
+  const hasCloudBase = /https?:\/\/[^\s]*\.(railway\.app|netlify\.app)/i.test(netBase)
+  if (looksLegacy && hasCloudBase) {
+    console.warn('[SharafERP] الجهاز معلق في الوضع المحلي القديم — إعادة التوجيه للخادم السحابي')
+    try { localStorage.setItem('sharaf-storage-mode', 'server') } catch {}
+    try { localStorage.setItem('sharaf-api-base', netBase.replace(/\/$/, '')) } catch {}
+    try { await db.delete() } catch {}
+    const { setStorageMode } = await import('./storage.js')
+    setStorageMode('server')
+    try {
+      const r = await serverLogin(username, password)
+      return { ok: true, user: r.user }
+    } catch (e) {
+      return { ok: false, error: (e.message || 'خطأ في المصادقة') + ' (الخادم السحابي)' }
     }
   }
   const user = await db.users
