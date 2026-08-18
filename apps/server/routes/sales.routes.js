@@ -309,6 +309,7 @@ router.post('/returns/:id/post', requireAuth, requirePermission('sales.create'),
     const head = await conn.query('SELECT * FROM sales_returns WHERE id = $1 FOR UPDATE', [id])
     const r = head.rows[0]
     if (!r) throw Object.assign(new Error('المرتجع غير موجود'), { status: 404 })
+    if (r.status !== 'draft') throw Object.assign(new Error('لا يمكن ترحيل مرتجع بحالة: ' + r.status), { status: 400 })
     const lines = await conn.query('SELECT * FROM sales_return_lines WHERE return_id = $1', [id])
     if (!lines.rows.length) throw Object.assign(new Error('لا يمكن ترحيل مرتجع بلا أصناف'), { status: 400 })
     /* إصلاح محاسبي: حساب الإجمالي من الأسطر (الواجهة قد لا ترسله) */
