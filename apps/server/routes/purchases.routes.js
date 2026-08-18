@@ -117,13 +117,15 @@ router.post('/:id/post', requireAuth, requirePermission('purchases.post'), async
     const entryNo = await nextEntryNo(conn)
     const jeLines = []
     let totalDebitInventory = 0
+    /* المورد (دائن) — خارج الحلقة حتى يتاح للدفعة الفورية أيضًا */
+    const acctsForSupplier = await acctIds(conn)
+    const supAcct = Number(p.supplier_account_id) || acctsForSupplier.supplier_ap
     for (const l of lines.rows) {
       /* المخزون (مدين) */
       const ids = await acctIds(conn)
       const invAcct = Number(itemMap.get(l.item_id)?.inventory_account_id) || ids.inventory
       totalDebitInventory += Number(l.line_total || 0)
-      /* المورد (دائن) */
-      const supAcct = Number(p.supplier_account_id) || ids.supplier_ap
+      /* المورد (دائن) — معرف خارج الحلقة */
       jeLines.push({ account_id: invAcct, description: `مشتريات: ${p.purchase_no} - ${itemMap.get(l.item_id)?.name}`, debit: Number(l.line_total || 0), credit: 0 })
       jeLines.push({ account_id: supAcct, description: `فاتورة مورد: ${p.purchase_no}`, debit: 0, credit: Number(l.line_total || 0) })
     }
