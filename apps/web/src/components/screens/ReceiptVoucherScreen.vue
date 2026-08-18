@@ -42,7 +42,7 @@
             </select>
           </div>
           <div class="search-box">
-            <span class="search-icon">🔍</span>
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input v-model="searchText" class="search-input" placeholder="ابحث برقم السند أو العميل..." @keydown.enter="applySearch" />
             <button class="search-go" @click="applySearch">انتقال</button>
           </div>
@@ -72,12 +72,12 @@
                 <td>{{ methodLabel(v.method) }}</td>
                 <td class="mono">{{ v.referenceNo || '—' }}</td>
                 <td class="num-cell"><b>{{ fmt(v.amount) }}</b></td>
-                <td><button class="act" title="طباعة" @click.stop="printVoucher(v)">🖨 طباعة</button></td>
+                <td><button class="act" title="طباعة" @click.stop="printVoucher(v)">طباعة</button></td>
               </tr>
               <tr v-if="visibleVouchers.length === 0">
                 <td colspan="7" class="empty-row">
                   <div class="empty-box">
-                    <span class="empty-icon">🧾</span>
+                    <span class="empty-icon">◈</span>
                     <p class="empty-title">لا توجد سندات قبض بعد</p>
                     <p class="empty-hint">اضغط «جديد» لإنشاء سند — مدين الصندوق/البنك / دائن ذمم العميل</p>
                   </div>

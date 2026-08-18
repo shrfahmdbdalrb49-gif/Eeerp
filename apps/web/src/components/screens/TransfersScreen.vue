@@ -4,7 +4,7 @@
     <div class="screen-layout">
       <div class="screen-sidebar">
         <button :class="['screen-tab', { active: tab === 'new' }]" @click="tab = 'new'">📤 تحويل جديد</button>
-        <button :class="['screen-tab', { active: tab === 'list' }]" @click="tab = 'list'">📋 سجل التحويلات</button>
+        <button :class="['screen-tab', { active: tab === 'list' }]" @click="tab = 'list'">سجل التحويلات</button>
       </div>
 
       <div class="screen-content">
@@ -32,7 +32,7 @@
           <div class="items-section">
             <div class="items-toolbar">
               <div class="search-box">
-                <input type="text" class="input-field" placeholder="🔍 ابحث عن صنف للتحويل..." v-model="itemQuery"
+                <input type="text" class="input-field" placeholder=" ابحث عن صنف للتحويل..." v-model="itemQuery"
                   @focus="showDropdown = true" @blur="setTimeout(() => showDropdown = false, 200)" />
                 <div v-if="showDropdown && filteredItems.length" class="search-dropdown">
                   <div v-for="it in filteredItems.slice(0, 8)" :key="it.id" class="dropdown-item" @mousedown.prevent="addItem(it)">

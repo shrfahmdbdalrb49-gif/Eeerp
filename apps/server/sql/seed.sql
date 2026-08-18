@@ -37,6 +37,8 @@ INSERT INTO role_permissions (role_name, permission) VALUES
   ('admin', 'reports.read'),
   ('admin', 'branches.manage'),
   ('admin', 'period.close'),
+  ('admin', 'transfers.read'),
+  ('admin', 'transfers.write'),
   ('admin', 'cashboxes.manage'),
 
   ('accountant', 'accounts.read'),
@@ -52,6 +54,7 @@ INSERT INTO role_permissions (role_name, permission) VALUES
   ('accountant', 'collections.read'),
   ('accountant', 'supplier_payments.read'),
   ('accountant', 'period.close'),
+  ('accountant', 'transfers.read'),
   ('accountant', 'treasury.read'),
   ('accountant', 'treasury.write'),
 
@@ -63,6 +66,8 @@ INSERT INTO role_permissions (role_name, permission) VALUES
   ('sales', 'customers.read'),
   ('sales', 'items.read'),
   ('sales', 'cashboxes.read'),
+  ('sales', 'transfers.read'),
+  ('sales', 'transfers.write'),
 
   ('cashier', 'sales.read'),
   ('cashier', 'sales.create'),

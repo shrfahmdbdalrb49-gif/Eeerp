@@ -16,13 +16,13 @@
           <span>الكل</span><span class="chip-count">{{ items.length }}</span>
         </div>
         <div class="filter-chip" :class="{ active: stockFilter === 'low' }" @click="stockFilter = stockFilter === 'low' ? '' : 'low'">
-          <span>رصيد منخفض ⚠</span><span class="chip-count">{{ lowCount }}</span>
+          <span>رصيد منخفض</span><span class="chip-count">{{ lowCount }}</span>
         </div>
         <div class="filter-chip" :class="{ active: stockFilter === 'out' }" @click="stockFilter = stockFilter === 'out' ? '' : 'out'">
           <span>نفذ من المخزون</span><span class="chip-count">{{ outCount }}</span>
         </div>
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input type="text" class="search-input" placeholder="ابحث بالاسم أو الكود أو الباركود..." v-model="search" />
           <button class="search-go" @click="applySearch">انتقال</button>
         </div>
@@ -63,12 +63,12 @@
               <td class="num-cell">{{ it.minStock || 0 }}</td>
               <td :class="expiryClass(it.nextExpiry)">{{ fmtDate(it.nextExpiry) || '—' }}</td>
               <td><span class="status-name" :class="isActive(it) ? 'ok' : 'off'">{{ isActive(it) ? 'نشط' : 'معطّل' }}</span></td>
-              <td><button class="act danger" @click="handleDelete(it)" :title="it.hasMovement ? 'لا يمكن الحذف — له حركات (سيتم تعطيله)' : 'حذف'">{{ it.hasMovement ? '🔒' : '✕' }}</button></td>
+              <td><button class="act danger" @click="handleDelete(it)" :title="it.hasMovement ? 'لا يمكن الحذف — له حركات (سيتم تعطيله)' : 'حذف'">{{ it.hasMovement ? '◈' : '✕' }}</button></td>
             </tr>
             <tr v-if="filtered.length === 0">
               <td colspan="12" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">💊</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا توجد أصناف بعد</p>
                   <p class="empty-hint">اضغط زر «جديد» لإضافة أول صنف — لا توجد بيانات وهمية في هذا النظام</p>
                 </div>

@@ -4,7 +4,7 @@
       <input
         type="text"
         class="input-field"
-        placeholder="🔍 ابحث عن صنف بالاسم أو الكود أو الباركود (بحث فعلي في قاعدة البيانات)..."
+        placeholder=" ابحث عن صنف بالاسم أو الكود أو الباركود (بحث فعلي في قاعدة البيانات)..."
         v-model="query"
         style="flex: 1; max-width: 380px"
         @input="runSearch"
@@ -42,7 +42,7 @@
       <div class="pos-cart">
         <div class="cart-title">
           <span>سلة البيع — {{ cart.length }} بنود</span>
-          <button class="btn btn-secondary small" @click="clearCart" :disabled="cart.length === 0">🗑 إفراغ</button>
+          <button class="btn btn-secondary small" @click="clearCart" :disabled="cart.length === 0">إفراغ</button>
         </div>
         <div class="cart-list">
           <div v-for="(line, i) in cart" :key="i" class="cart-row">
@@ -79,7 +79,7 @@
         </div>
 
         <button class="btn btn-success checkout-btn" @click="checkout" :disabled="cart.length === 0 || checkingOut">
-          {{ checkingOut ? 'جارٍ الترحيل...' : `✓ إتمام البيع — ${fmt(cartTotal)}` }}
+          {{ checkingOut ? 'جارٍ الترحيل...' : `✔ إتمام البيع — ${fmt(cartTotal)}` }}
         </button>
         <div v-if="checkoutError" class="checkout-error">{{ checkoutError }}</div>
       </div>
@@ -217,7 +217,7 @@ async function loadData() {
       const stockRes = await apiFetch('/batches')
       const batches = Array.isArray(stockRes) ? stockRes : []
       const stockMap = {}
-      for (const b of batches) if (b.qty > 0) stockMap[b.item_id] = (stockMap[b.item_id] || 0) + b.qty
+      for (const b of batches) if (b.qty > 0) stockMap[b.item_id] = (stockMap[b.item_id] || 0) + Number(b.qty || 0)
       items.value = raw.map(it => ({ ...it, sellPrice: Number(it.sellPrice ?? it.price) || 0, stock: stockMap[it.id] || 0, _stock: stockMap[it.id] || 0 })).sort((a, b) => a.name.localeCompare(b.name, 'ar'))
       customers.value = await activeCustomers()
       return
@@ -226,7 +226,7 @@ async function loadData() {
   const raw = await activeItems()
   const batches = await db.batches.toArray()
   const stockMap = {}
-  for (const b of batches) if (!b.quarantined && b.qty > 0) stockMap[b.itemId] = (stockMap[b.itemId] || 0) + b.qty
+  for (const b of batches) if (!b.quarantined && b.qty > 0) stockMap[b.itemId] = (stockMap[b.itemId] || 0) + Number(b.qty || 0)
   items.value = raw.map(it => ({ ...it, sellPrice: Number(it.sellPrice ?? it.price) || 0, stock: stockMap[it.id] || 0, _stock: stockMap[it.id] || 0 })).sort((a, b) => a.name.localeCompare(b.name, 'ar'))
   customers.value = await activeCustomers()
 }

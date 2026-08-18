@@ -8,16 +8,13 @@
     <!-- شاشة تسجيل الدخول تُعرض قبل كل شيء حتى المصادقة الفعلية -->
     <LoginScreen v-if="!authenticated" @logged-in="onLoggedIn" />
     <template v-else>
-    <!-- الشريط العلوي الرئيسي -->
-    <MainRibbon
-      :active-menu="activeMenu"
+    <!-- الشريط العلوي المكتبي الموحّد (قائمة + بحث + علامة تجارية) -->
+    <TopBar
+      :active-page="activePage"
       :user-name="currentUser?.fullName || 'مدير النظام'"
       :role-label="roleLabel"
-      @menu-change="handleHeaderMenuChange"
+      @select="selectPage"
     />
-
-    <!-- شريط القائمة الرئيسي الأفقي (Desktop ERP Menu Bar) -->
-    <MenuBar :active-page="activePage" @select="selectPage" />
 
     <!-- الحاوية الرئيسية -->
     <div class="main-container">
@@ -116,11 +113,12 @@
       </Workspace>
     </div>
 
-    <!-- شريط المهام السفلي -->
-    <Taskbar
+    <!-- شريط الحالة المكتبي السفلي -->
+    <StatusBar
       :windows="openWindows"
       :active-window="activeWindowId"
       :user-name="currentUser?.fullName || 'مدير النظام'"
+      :role-label="roleLabel"
       @window-activate="activeWindowId = $event"
     />
     </template>
@@ -130,10 +128,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LoginScreen from './components/screens/LoginScreen.vue'
-import MainRibbon from './components/layout/MainRibbon.vue'
-import MenuBar from './components/layout/MenuBar.vue'
+import TopBar from './components/layout/TopBar.vue'
 import Workspace from './components/layout/Workspace.vue'
-import Taskbar from './components/layout/Taskbar.vue'
+import StatusBar from './components/layout/StatusBar.vue'
 import JournalScreen from './components/screens/JournalScreen.vue'
 import ReportsScreen from './components/screens/ReportsScreen.vue'
 import PurchasesScreen from './components/screens/PurchasesScreen.vue'
@@ -180,14 +177,6 @@ const roleLabel = computed(() => {
   return roles[currentUser.value?.role] || currentUser.value?.role || 'مدير النظام'
 })
 
-/** معالجة أحداث الهيدر: menu-change(value) للتبديل العادي، و('search', page) للبحث السريع */
-function handleHeaderMenuChange(valueOrEvent, page) {
-  if (page) {
-    selectPage(page)
-    return
-  }
-  activeMenu.value = valueOrEvent
-}
 const activeWindowId = ref('win-1')
 const activePage = ref(null)
 

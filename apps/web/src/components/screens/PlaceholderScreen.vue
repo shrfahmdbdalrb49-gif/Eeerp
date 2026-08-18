@@ -7,7 +7,7 @@
     </div>
     <div class="placeholder-body">
       <p>{{ description }}</p>
-      <p class="hint">⚠️ هذه الميزة غير منفذة فعليًا — لا تُظهر بيانات حقيقية ولا تحفظ أي شيء.</p>
+      <p class="hint"> هذه الميزة غير منفذة فعليًا — لا تُظهر بيانات حقيقية ولا تحفظ أي شيء.</p>
     </div>
   </div>
 </template>

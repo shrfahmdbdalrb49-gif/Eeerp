@@ -2,7 +2,7 @@
   <div class="doctors-screen">
     <div class="screen-toolbar">
       <button class="btn btn-primary" @click="openForm()">+ طبيب جديد</button>
-      <input type="text" class="input-field search" placeholder="🔍 بحث بالاسم، التخصص، الهاتف..." v-model="search" />
+      <input type="text" class="input-field search" placeholder=" بحث بالاسم، التخصص، الهاتف..." v-model="search" />
       <select class="input-field" v-model="specialtyFilter" style="width:150px">
         <option value="">كل التخصصات</option>
         <option v-for="sp in specialties" :key="sp" :value="sp">{{ sp }}</option>

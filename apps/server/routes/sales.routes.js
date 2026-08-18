@@ -270,7 +270,7 @@ router.post('/:id/cancel', requireAuth, requirePermission('sales.cancel'), async
 })
 
 /* ---------- مرتجعات المبيعات ---------- */
-router.post('/sales-returns', requireAuth, requirePermission('sales.create'), async (req, res, next) => {
+router.post('/returns', requireAuth, requirePermission('sales.create'), async (req, res, next) => {
   try {
     const f = req.body
     const conn = await getPool().connect()
@@ -297,7 +297,7 @@ router.post('/sales-returns', requireAuth, requirePermission('sales.create'), as
   } catch (err) { next(err) }
 })
 
-router.post('/sales-returns/:id/post', requireAuth, requirePermission('sales.create'), async (req, res, next) => {
+router.post('/returns/:id/post', requireAuth, requirePermission('sales.create'), async (req, res, next) => {
   const conn = await getPool().connect()
   try {
     const id = Number(req.params.id)

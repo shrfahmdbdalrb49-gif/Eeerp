@@ -14,10 +14,10 @@
       <!-- تبويبات pill -->
       <div class="tab-row">
         <button class="tab-btn" :class="{ active: tab === 'log' }" @click="tab = 'log'">
-          <span class="tab-icon">📋</span> سجل التحصيلات
+          <span class="tab-icon"></span> سجل التحصيلات
         </button>
         <button class="tab-btn" :class="{ active: tab === 'aging' }" @click="tab = 'aging'">
-          <span class="tab-icon">📊</span> الأرصدة الآجلة
+          <span class="tab-icon"></span> الأرصدة الآجلة
         </button>
       </div>
 
@@ -46,7 +46,7 @@
             <tr v-if="collections.length === 0">
               <td colspan="6" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">💰</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا توجد تحصيلات بعد</p>
                   <p class="empty-hint">سند قبض يُرحّل فعليًا قيدًا محاسبيًا ويخفض ذمم العميل</p>
                 </div>
@@ -77,7 +77,7 @@
             <tr v-if="aging.length === 0">
               <td colspan="4" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">📭</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا يوجد عملاء بعد</p>
                 </div>
               </td>

@@ -38,7 +38,7 @@
             <input type="date" class="chip-date" v-model="filters.dateTo" title="إلى" />
           </div>
           <div class="search-box">
-            <span class="search-icon">🔍</span>
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input v-model="searchText" class="search-input" placeholder="ابحث برقم الفاتورة أو المورد..." @keydown.enter="applySearch" />
             <button class="search-go" @click="applySearch">انتقال</button>
           </div>
@@ -76,18 +76,18 @@
                   <span class="status-name" :class="inv.status">{{ statusLabel(inv.status) }}</span>
                 </td>
                 <td class="action-cells">
-                  <button class="act" title="عرض" @click.stop="viewInvoice(inv)">👁</button>
-                  <button v-if="inv.status === 'draft'" class="act" title="استلام — يزيد المخزون فعليًا" @click.stop="receiveInvoice(inv)">📥 استلام</button>
+                  <button class="act" title="عرض" @click.stop="viewInvoice(inv)">◈</button>
+                  <button v-if="inv.status === 'draft'" class="act" title="استلام — يزيد المخزون فعليًا" @click.stop="receiveInvoice(inv)">◈ استلام</button>
                   <button v-if="inv.status === 'received'" class="act ok" title="ترحيل محاسبي — ينشئ قيد مزدوج" @click.stop="postInvoice(inv)">✔ ترحيل</button>
                   <button v-if="inv.status === 'received'" class="act danger" title="إلغاء الاستلام — يخصم المخزون" @click.stop="unreceiveInvoice(inv)">↺</button>
-                  <button v-if="inv.status === 'posted'" class="act" title="طباعة" @click.stop="viewInvoice(inv, true)">🖨</button>
+                  <button v-if="inv.status === 'posted'" class="act" title="طباعة" @click.stop="viewInvoice(inv, true)">طباعة</button>
                   <button v-if="canCancel(inv)" class="act danger" title="إلغاء — يعكس المخزون والقيود" @click.stop="deleteInvoice(inv)">✕</button>
                 </td>
               </tr>
               <tr v-if="visibleInvoices.length === 0">
                 <td colspan="9" class="empty-row">
                   <div class="empty-box">
-                    <span class="empty-icon">🛒</span>
+                    <span class="empty-icon">◈</span>
                     <p class="empty-title">{{ hasFilters ? 'لا توجد فواتير مطابقة للفلترة' : 'لا توجد فواتير شراء بعد' }}</p>
                     <p class="empty-hint">اضغط زر «جديد» لإنشاء فاتورة شراء — الاستلام يزيد المخزون والتسجيل بقيد مزدوج</p>
                   </div>
@@ -182,12 +182,12 @@
                 <td><input type="number" min="0" step="0.01" class="li" v-model.number="l.tax" /></td>
                 <td class="num-cell row-total">{{ fmt(lineTotal(l)) }}</td>
                 <td><input type="date" class="li" v-model="l.expDate" /></td>
-                <td><button class="delete-btn" @click="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف البند">🗑</button></td>
+                <td><button class="delete-btn" @click="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف البند">✕</button></td>
               </tr>
             </tbody>
           </table>
           <div v-else class="lines-empty">
-            <span class="empty-icon">📦</span>
+            <span class="empty-icon">◈</span>
             <p class="empty-title">لا توجد بنود في الفاتورة</p>
             <p class="empty-hint">استخدم البحث السريع أو زر إضافة بند لإضافة الأصناف</p>
           </div>
@@ -213,7 +213,7 @@
 
         <div class="form-actions-row">
           <button class="btn btn-outline" @click="closeForm">✕ إلغاء</button>
-          <button class="btn btn-outline" @click="saveInvoice(false)" :disabled="saving">💾 حفظ كمسودة</button>
+          <button class="btn btn-outline" @click="saveInvoice(false)" :disabled="saving">حفظ كمسودة</button>
           <button class="btn btn-primary" @click="saveInvoice(true)" :disabled="saving">
             <span v-if="saving" class="spin">⏳</span>
             <span>استلام وترحيل</span>
@@ -259,7 +259,7 @@
         </table>
         <div class="invoice-total">الإجمالي: <strong>{{ fmt(viewedTotal) }} ري</strong></div>
         <div class="print-actions print-hide">
-          <button class="btn btn-primary" @click="doPrint">🖨 طباعة</button>
+          <button class="btn btn-primary" @click="doPrint">طباعة</button>
           <button class="btn btn-outline" @click="showView = false">إغلاق</button>
         </div>
       </div>

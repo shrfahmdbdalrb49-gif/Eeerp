@@ -23,7 +23,7 @@
           </div>
           <div class="topbar-left">
             <div class="tb-search">
-              <span class="tb-search-icon">🔍</span>
+              <svg class="tb-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input v-model="searchText" placeholder="بحث رقم/عميل..." @keydown.enter="applySearch" />
             </div>
             <select class="df-small" v-model="listFilter">
@@ -60,14 +60,14 @@
                 <td><span class="status-dot" :class="inv.status || 'posted'"></span><span class="status-name" :class="inv.status || 'posted'">{{ statusName(inv.status) }}</span></td>
                 <td class="action-cells">
                   <button class="act" title="استئناف / فتح" @click.stop="openInvoiceForEdit(inv)">{{ inv.status === 'on_hold' ? 'استرجاع' : 'فتح' }}</button>
-                  <button class="act" title="طباعة" @click.stop="printInvoice(inv)">🖨</button>
+                  <button class="act" title="طباعة" @click.stop="printInvoice(inv)">طباعة</button>
                   <button v-if="(inv.status || 'posted') === 'posted'" class="act danger" title="إلغاء (عكس المخزون والقيود)" @click.stop="cancelInvoice(inv)">✕</button>
                 </td>
               </tr>
               <tr v-if="visibleInvoices.length === 0">
                 <td colspan="7" class="empty-row">
                   <div class="empty-box">
-                    <span class="empty-icon">📦</span>
+                    <span class="empty-icon">◈</span>
                     <p class="empty-title">لا توجد فواتير</p>
                     <p class="empty-hint">اضغط «فاتورة جديدة» أو F11</p>
                   </div>
@@ -152,7 +152,7 @@
         <!-- 4. شريط إدخال الصنف: حقل كبير واحد + الكمية بجانبه + نتائج فورية تحت الحقل -->
         <div class="ox-itembar">
           <div class="ox-search-cell" :class="{ 'ox-field-focus': dropdownOpen }">
-            <span class="tb-search-icon">🔍</span>
+            <svg class="tb-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input class="ox-search-input" v-model="quickItem" placeholder="اكتب أول حرف من اسم الصنف أو امسح الباركود... (Enter للإضافة)"
                    list="quick-items" ref="quickInput"
                    @input="onQuickSearch" @focus="openItemDropdown"
@@ -205,7 +205,7 @@
                     <span class="ox-line-item">{{ itemOf(l.itemId)?.name || '—' }} <span class="dd-code" v-if="barcodeOf(l.itemId)">{{ barcodeOf(l.itemId) }}</span></span>
                     <span class="ox-line-lot">{{ l.lotLabel || '—' }}</span>
                     <span class="ox-line-exp">{{ expiryOf(l.itemId) || '—' }}</span>
-                    <button class="delete-btn-sm" @click.stop="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف السطر">🗑</button>
+                    <button class="delete-btn-sm" @click.stop="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف السطر">✕</button>
                   </div>
                   <div class="ox-line-grid">
                     <div class="ox-line-cell"><label>الوحدة</label><span>{{ unitLabel(l.unit || itemOf(l.itemId)?.unit) || '—' }}</span></div>
@@ -225,7 +225,7 @@
                 <td><input type="number" min="0" step="0.01" class="lx" v-model.number="l.discount" @input="recalc()" @keydown.enter.prevent="enterLine(i)" :disabled="!canEditDiscount" :title="canEditDiscount ? '' : 'الخصم مقيد بالصلاحيات'" /></td>
                 <td><input type="number" min="0" step="0.01" class="lx" v-model.number="l.tax" @input="recalc()" @keydown.enter.prevent="enterLine(i)" /></td>
                 <td class="num-cell row-total">{{ fmt(lineTotal(l)) }}</td>
-                <td><button class="delete-btn-sm" @click="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف السطر (F3)">🗑</button></td>
+                <td><button class="delete-btn-sm" @click="removeLine(i)" :disabled="form.lines.length <= 1" title="حذف السطر (F3)">✕</button></td>
               </tr>
               <tr v-if="lineHasWarning(form.lines[form.lines.length - 1])" class="warn-band">
                 <td colspan="12" class="warn-text">{{ lastWarning }}</td>
@@ -350,12 +350,12 @@
 
         <!-- 8. شريط الأوامر السفلي الواحد -->
         <div class="ox-cmdbar">
-          <button class="cm-btn" @click="openNewInvoice" title="F11">➕ جديد</button>
-          <button class="cm-btn" @click="goList" title="السجل">📋 سجل</button>
-          <button class="cm-btn" @click="saveDraft" :disabled="saving" title="F9">💾 حفظ</button>
-          <button class="cm-btn primary" @click="save" :disabled="saving" title="F8">✔ ترحيل</button>
-          <button class="cm-btn" @click="saveThenPrint" :disabled="saving">🖨 طباعة</button>
-          <button class="cm-btn warn" @click="holdInvoice" :disabled="saving" title="F4">⏸ تعليق</button>
+          <button class="cm-btn" @click="openNewInvoice" title="F11">+ جديد</button>
+          <button class="cm-btn" @click="goList" title="السجل">سجل</button>
+          <button class="cm-btn" @click="saveDraft" :disabled="saving" title="F9">حفظ</button>
+          <button class="cm-btn primary" @click="save" :disabled="saving" title="F8">ترحيل (F8)</button>
+          <button class="cm-btn" @click="saveThenPrint" :disabled="saving">طباعة</button>
+          <button class="cm-btn warn" @click="holdInvoice" :disabled="saving" title="F4">تعليق (F4)</button>
           <button class="cm-btn warn" @click="openDiscountByAmount" title="F5">خصم مبلغ</button>
           <button class="cm-btn warn" @click="openDiscountByPercent" title="F6">خصم %</button>
           <button class="cm-btn" @click="openMultiPay" title="F12">تعدد الدفع</button>
@@ -415,7 +415,7 @@
               <button class="pay-chip" :class="{ active: payForm.method === 'card' }" @click="payForm.method = 'card'">💳 بطاقة</button>
               <button class="pay-chip" :class="{ active: payForm.method === 'transfer' }" @click="payForm.method = 'transfer'">🏦 تحويل</button>
               <button class="pay-chip" :class="{ active: payForm.method === 'bank' }" @click="payForm.method = 'bank'">🏢 بنك</button>
-              <button class="pay-chip" :class="{ active: payForm.method === 'credit' }" @click="payForm.method = 'credit'">📄 آجل</button>
+              <button class="pay-chip" :class="{ active: payForm.method === 'credit' }" @click="payForm.method = 'credit'">◈ آجل</button>
             </div>
           </div>
           <div class="mini-field"><label>المبلغ المدفوع (المتبقي يعامل كآجل/مستحق)</label>
@@ -443,13 +443,13 @@
               <option value="transfer">تحويل</option><option value="bank">بنك</option>
             </select>
             <input type="number" min="0" step="0.01" class="ox-inp" v-model.number="p.amount" />
-            <button class="delete-btn-sm" @click="multiPayList.splice(pi, 1)" :disabled="multiPayList.length <= 1">🗑</button>
+            <button class="delete-btn-sm" @click="multiPayList.splice(pi, 1)" :disabled="multiPayList.length <= 1">✕</button>
           </div>
           <button class="tb-btn ghost" @click="multiPayList.push({ method: 'cash', amount: 0 })">+ طريقة أخرى</button>
           <div class="multi-total">
             <span>الإجمالي الموزع: <b>{{ fmt(multiPayTotal) }}</b></span>
             <span :class="multiPayTotal > netTotal ? 'multi-over' : 'hint-text'">
-              صافي الفاتورة: {{ fmt(netTotal) }} — {{ multiPayTotal >= netTotal ? '✓ التوزيع يغطي الفاتورة' : 'المتبقي غير الموزع: ' + fmt(netTotal - multiPayTotal) }}
+              صافي الفاتورة: {{ fmt(netTotal) }} — {{ multiPayTotal >= netTotal ? '✔ التوزيع يغطي الفاتورة' : 'المتبقي غير الموزع: ' + fmt(netTotal - multiPayTotal) }}
             </span>
           </div>
           <div class="mini-actions">
@@ -504,7 +504,7 @@
           </table>
           <div class="invoice-total">الإجمالي: <strong>{{ fmt(viewed.total || 0) }} ري</strong></div>
           <div class="print-actions print-hide">
-            <button class="btn btn-primary" @click="window.print()">🖨 طباعة</button>
+            <button class="btn btn-primary" @click="window.print()">طباعة</button>
             <button class="btn btn-outline" @click="showView = false">إغلاق</button>
           </div>
         </div>
@@ -768,7 +768,7 @@ async function loadData() {
       const stockMap = {}, batchesMap = {}
       for (const x of (Array.isArray(b) ? b : [])) {
         if (!x.quarantined && x.qty > 0) {
-          stockMap[x.item_id] = (stockMap[x.item_id] || 0) + x.qty
+          stockMap[x.item_id] = (stockMap[x.item_id] || 0) + Number(x.qty || 0)
           ;(batchesMap[x.item_id] = batchesMap[x.item_id] || []).push(x)
         }
       }
@@ -826,7 +826,7 @@ async function loadData() {
   const stockMap = {}, batchesMap = {}
   for (const x of b) {
     if (!x.quarantined && x.qty > 0) {
-      stockMap[x.itemId] = (stockMap[x.itemId] || 0) + x.qty
+      stockMap[x.itemId] = (stockMap[x.itemId] || 0) + Number(x.qty || 0)
       ;(batchesMap[x.itemId] = batchesMap[x.itemId] || []).push(x)
     }
   }
@@ -1587,7 +1587,7 @@ onUnmounted(() => {
 .ox-qty { width: 84px; border: 1px solid #c7ced9; border-radius: 6px; padding: 0 8px; font-size: 13px; outline: none; min-height: 32px; text-align: center; }
 .ox-qty:focus { border-color: #1f6feb; box-shadow: 0 0 0 2px rgba(31,111,235,.15); }
 .ox-add-btn { white-space: nowrap; min-height: 32px; }
-.tb-search-icon { color: #6b7280; }
+.tb-search-icon { color: #6b7280; width: 18px; height: 18px; flex: 0 0 18px; display: inline-block; }
 
 /* ---------- القائمة الفورية ---------- */
 .dd {

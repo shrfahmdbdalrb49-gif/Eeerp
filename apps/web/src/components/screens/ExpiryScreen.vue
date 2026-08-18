@@ -7,7 +7,7 @@
           <p class="page-subtitle">من تشغيلات المخزون الفعلية في قاعدة البيانات — التشغيلة المنتهية تُعزل تلقائيًا عن البيع</p>
         </div>
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input type="text" class="search-input" placeholder="بحث بالصنف أو التشغيلة..." v-model="search" />
         </div>
       </div>
@@ -22,7 +22,7 @@
       </div>
 
       <div class="alert-banner" v-if="expiredCount > 0">
-        <span class="alert-icon">⚠️</span>
+        <span class="alert-icon"></span>
         <span>تنبيه: يوجد <strong>{{ expiredCount }}</strong> تشغيلة منتهية الصلاحية — أُعيدت تلقائيًا عن البيع</span>
       </div>
 
@@ -54,13 +54,13 @@
               <td class="num-cell">{{ fmt(r.qty * r.cost) }}</td>
               <td><span class="status-pill" :class="r.quarantined ? 'quar' : r.days < 0 ? 'expired' : r.days <= 90 ? 'near' : 'ok'">{{ r.quarantined ? 'معزول' : r.days < 0 ? 'منتهية' : r.days <= 90 ? 'قريبة' : 'سليمة' }}</span></td>
               <td>
-                <button class="act" :title="r.quarantined ? 'إعادة عن البيع' : 'إبعاد عن البيع'" @click="quarantine(r)">{{ r.quarantined ? '🔓' : '🚫' }}</button>
+                <button class="act" :title="r.quarantined ? 'إعادة عن البيع' : 'إبعاد عن البيع'" @click="quarantine(r)">{{ r.quarantined ? 'إتاحة' : 'إبعاد' }}</button>
               </td>
             </tr>
             <tr v-if="visible.length === 0">
               <td colspan="10" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">🗓️</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا توجد تشغيلات صالحة بعد</p>
                   <p class="empty-hint">استلم شحنات شراء فعلية لتظهر هنا</p>
                 </div>

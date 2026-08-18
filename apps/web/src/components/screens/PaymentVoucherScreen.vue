@@ -25,7 +25,7 @@
           </div>
           <div class="topbar-left">
             <div class="tb-search">
-              <span class="tb-search-icon">🔍</span>
+              <svg class="tb-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input v-model="searchText" placeholder="بحث رقم/مستفيد..." />
             </div>
             <select class="df-small" v-model="listFilter">
@@ -69,15 +69,15 @@
                 <td><span class="status-dot" :class="v.status || 'posted'"></span><span class="status-name" :class="v.status || 'posted'">{{ statusName(v.status) }}</span></td>
                 <td class="action-cells">
                   <button class="act" title="فتح للتعديل" @click.stop="openVoucherForEdit(v)">فتح</button>
-                  <button class="act" title="عرض القيد المحاسبي" @click.stop="viewJournal(v)">📒</button>
-                  <button class="act" title="طباعة" @click.stop="printVoucher(v)">🖨</button>
+                  <button class="act" title="عرض القيد المحاسبي" @click.stop="viewJournal(v)">◈</button>
+                  <button class="act" title="طباعة" @click.stop="printVoucher(v)">طباعة</button>
                   <button v-if="(v.status || 'draft') === 'posted'" class="act danger" title="إلغاء (عكس القيد المحاسبي)" @click.stop="cancelVoucher(v)">✕</button>
                 </td>
               </tr>
               <tr v-if="visiblePayments.length === 0">
                 <td colspan="8" class="empty-row">
                   <div class="empty-box">
-                    <span class="empty-icon">💸</span>
+                    <span class="empty-icon">◈</span>
                     <p class="empty-title">لا توجد سندات صرف</p>
                     <p class="empty-hint">اضغط «سند جديد» أو F11 — مدين المستفيد ← دائن الصندوق أو البنك</p>
                   </div>
@@ -96,14 +96,14 @@
               <div class="pv-card-row"><label>الحالة</label><span><span class="status-dot" :class="v.status || 'posted'"></span><span class="status-name" :class="v.status || 'posted'">{{ statusName(v.status) }}</span></span></div>
               <div class="pv-card-acts">
                 <button class="act" @click.stop="openVoucherForEdit(v)">فتح</button>
-                <button class="act" title="عرض القيد المحاسبي" @click.stop="viewJournal(v)">📒 اليومية</button>
-                <button class="act" title="طباعة" @click.stop="printVoucher(v)">🖨 طباعة</button>
+                <button class="act" title="عرض القيد المحاسبي" @click.stop="viewJournal(v)">◈ اليومية</button>
+                <button class="act" title="طباعة" @click.stop="printVoucher(v)">طباعة</button>
                 <button v-if="(v.status || 'draft') === 'posted'" class="act danger" title="إلغاء (عكس القيد المحاسبي)" @click.stop="cancelVoucher(v)">✕ إلغاء</button>
               </div>
             </div>
           </div>
           <div class="pv-cards" v-if="isMobile && visiblePayments.length === 0">
-                <div class="pv-card"><div class="pv-card-row full"><span class="empty-icon">💸</span><p class="empty-title">لا توجد سندات صرف</p><p class="empty-hint">اضغط «سند جديد» أو F11 — مدين المستفيد ← دائن الصندوق أو البنك</p></div></div>
+                <div class="pv-card"><div class="pv-card-row full"><span class="empty-icon">◈</span><p class="empty-title">لا توجد سندات صرف</p><p class="empty-hint">اضغط «سند جديد» أو F11 — مدين المستفيد ← دائن الصندوق أو البنك</p></div></div>
           </div>
         </div>
       </div>
@@ -120,8 +120,8 @@
           <span class="status-name" :class="editStatusClass">{{ editStatusName }}</span>
           <span class="ox-title-sep" v-if="form.voucher_no">· {{ form.voucher_no }}</span>
           <div class="topbar-center">
-            <button class="tb-btn" @click="openJournalModal" title="عرض القيد المحاسبي">📒 اليومية</button>
-            <button class="tb-btn" @click="printVoucher()" :disabled="!form.id" title="طباعة">🖨 طباعة</button>
+            <button class="tb-btn" @click="openJournalModal" title="عرض القيد المحاسبي">◈ اليومية</button>
+            <button class="tb-btn" @click="printVoucher()" :disabled="!form.id" title="طباعة">طباعة</button>
           </div>
         </div>
 
@@ -231,7 +231,7 @@
                          @keydown.f3.prevent="copyHeaderStatement(li)" />
                 </td>
                 <td class="num-cell"><input type="number" class="ox-qty" v-model.number="line.amount" min="0" step="0.01" @input="recompute"/></td>
-                <td><button class="delete-btn-sm" @click="removeLine(li)" title="حذف السطر">🗑</button></td>
+                <td><button class="delete-btn-sm" @click="removeLine(li)" title="حذف السطر">✕</button></td>
               </tr>
               <!-- صف الإضافة -->
               <tr>
@@ -262,7 +262,7 @@
             <div v-for="(line, li) in form.lines" :key="'c' + li" class="ox-line-card">
               <div class="ox-line-card-top">
                 <span class="ox-line-item">{{ li + 1 }}. {{ line.kind === 'supplier' ? 'ذمم الموردين — ' + supplierOf(line.supplierId)?.name : line.expenseName }}</span>
-                <button class="delete-btn-sm" @click="removeLine(li)">🗑</button>
+                <button class="delete-btn-sm" @click="removeLine(li)">✕</button>
               </div>
               <div class="ox-line-grid">
                 <div class="ox-line-cell"><label>البيان</label><input class="ox-inp" v-model="line.statement" style="min-height:26px" @keydown.f3.prevent="copyHeaderStatement(li)"/></div>
@@ -299,11 +299,11 @@
 
         <!-- 8. شريط الأوامر السفلي الواحد -->
         <div class="ox-cmdbar">
-          <button class="cm-btn" @click="openNewVoucher" title="F11">➕ جديد</button>
-          <button class="cm-btn" @click="saveDraft" :disabled="saving" title="F2">💾 حفظ مسودة</button>
+          <button class="cm-btn" @click="openNewVoucher" title="F11">+ جديد</button>
+          <button class="cm-btn" @click="saveDraft" :disabled="saving" title="F2">حفظ مسودة</button>
           <button class="cm-btn primary" @click="save" :disabled="saving" title="F10">✔ ترحيل (F10)</button>
-          <button class="cm-btn" @click="printVoucher()" :disabled="!form.id">🖨 طباعة</button>
-          <button class="cm-btn" @click="openJournalModal" :disabled="!form.id">📒 القيد</button>
+          <button class="cm-btn" @click="printVoucher()" :disabled="!form.id">طباعة</button>
+          <button class="cm-btn" @click="openJournalModal" :disabled="!form.id">◈ القيد</button>
           <button class="cm-btn danger" @click="closeWindow">✕ إلغاء</button>
         </div>
       </div>
@@ -319,7 +319,7 @@
     <!-- نافذة عرض القيد المحاسبي (اليومية) -->
     <div v-if="journalModalOpen" class="form-modal-overlay" @click.self="journalModalOpen = false">
       <div class="mini-form wide">
-        <div class="mini-form-title"><span>📒 القيد المحاسبي — سند صرف {{ form.voucher_no }}</span><button class="close-btn" @click="journalModalOpen = false">✕</button></div>
+        <div class="mini-form-title"><span>◈ القيد المحاسبي — سند صرف {{ form.voucher_no }}</span><button class="close-btn" @click="journalModalOpen = false">✕</button></div>
         <div class="mini-field" style="max-height:340px; overflow:auto">
           <div v-if="journalEntry">
             <p class="hint-text">رقم القيد: {{ journalEntry.entry_no || '#' + journalEntry.id }} · التاريخ: {{ journalEntry.date }}</p>
@@ -841,7 +841,7 @@ async function printVoucher(v) {
     <table><thead><tr><th style="width:40%">الحساب المدين</th><th>البيان</th><th style="width:25%">المبلغ</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="totals"><span>إجمالي التفاصيل: ${fmt(dt)}</span><span>مبلغ الرأس: ${fmt(data.amount || 0)}</span></div>
     <div class="sig"><span>المحرر: ${currentUserName.value}</span><span>المستلم: ......................</span><span>المعتمد: ......................</span></div>
-    <p class="noprint" style="margin-top:20px"><button onclick="window.print()">🖨 طباعة</button></p>
+    <p class="noprint" style="margin-top:20px"><button onclick="window.print()">طباعة</button></p>
     </body></html>`)
   w.document.close()
 }

@@ -19,6 +19,7 @@ import salesRoutes from './routes/sales.routes.js'
 import collectionsRoutes from './routes/collections.routes.js'
 import supplierPaymentsRoutes from './routes/supplierPayments.routes.js'
 import journalsRoutes from './routes/journals.routes.js'
+import transfersRoutes from './routes/transfers.routes.js'
 import reportsRoutes from './routes/reports.routes.js'
 import auditRoutes from './routes/audit.routes.js'
 import setupRoutes from './routes/setup.routes.js'
@@ -33,8 +34,8 @@ const PORT = process.env.PORT || 4000
 app.use(cors({ origin: true, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 
-app.get('/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v66', ts: new Date().toISOString() }))
-app.get('/api/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v66', ts: new Date().toISOString() }))
+app.get('/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v69', ts: new Date().toISOString() }))
+app.get('/api/health', (req, res) => res.json({ ok: true, name: 'Sharaf ERP API', build: 'v69', ts: new Date().toISOString() }))
 
 /* جميع نقاط API تحت /api */
 app.use('/api/auth', authRoutes)
@@ -47,6 +48,7 @@ app.use('/api/sales', salesRoutes)
 app.use('/api/collections', collectionsRoutes)
 app.use('/api/supplier-payments', supplierPaymentsRoutes)
 app.use('/api/journals', journalsRoutes)
+app.use('/api/transfers', transfersRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/setup', setupRoutes)
@@ -91,12 +93,21 @@ readTable('doctors', 'doctors', 'prescriptions', 'id')
 readTable('prescriptions', 'prescriptions', 'prescriptions', 'id')
 readTable('prescription-lines', 'prescription_lines', 'prescriptions', 'id')
 readTable('held-invoices', 'held_invoices', 'sales', 'id')
-app.get('/api/sales/returns', requireAuth, requirePermission('sales.read'), async (req, res, next) => {
+app.get('/api/sales-returns', requireAuth, requirePermission('sales.read'), async (req, res, next) => {
   try {
-    const rows = await (await getPool().connect()).query(`SELECT * FROM sales_returns ORDER BY id DESC LIMIT 500`)
-    res.json(rows.rows)
+    const conn = await getPool().connect()
+    try {
+      const rows = await conn.query(`SELECT r.*, c.name AS customer_name, s.invoice_no AS original_invoice_no
+        FROM sales_returns r
+        LEFT JOIN customers c ON c.id = r.customer_id
+        LEFT JOIN sales_invoices s ON s.id = r.original_invoice_id
+        ORDER BY r.id DESC LIMIT 500`)
+      res.json(rows.rows)
+    } finally { conn.release() }
   } catch (err) { next(err) }
 })
+app.post('/api/sales-returns', (req, res, next) => { req.url = '/returns'; req.baseUrl = ''; salesRoutes(req, res, next) })
+app.post('/api/sales-returns/:id/post', (req, res, next) => { req.url = '/returns/' + Number(req.params.id) + '/post'; salesRoutes(req, res, next) })
 
 /* ملفات ثابتة: البناء الأمامي نفسه (مجلد serve بمسارات جذرية) */
 const serveDir = join(__dirname, 'serve')

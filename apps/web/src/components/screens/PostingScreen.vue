@@ -104,7 +104,7 @@ async function postOne(id) {
   try {
     await requirePermission('journal.write', 'ترحيل قيد معلق')
     await postPendingEntry(id)
-    toast('تم ترحيل القيد بنجاح ✓')
+    toast('تم ترحيل القيد بنجاح ✔')
     await loadData()
   } catch (e) {
     toast(e.message, false)
@@ -128,7 +128,7 @@ async function postAll() {
         break
       }
     }
-    toast(ok ? 'تم ترحيل ' + ok + ' قيد(ًا) بنجاح ✓' : 'لم يُرحّل أي قيد', ok > 0)
+    toast(ok ? 'تم ترحيل ' + ok + ' قيد(ًا) بنجاح ✔' : 'لم يُرحّل أي قيد', ok > 0)
     await loadData()
   } catch (e) {
     toast(e.message, false)

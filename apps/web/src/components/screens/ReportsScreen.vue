@@ -6,7 +6,7 @@
           <h1>التقارير المالية</h1>
           <p class="page-subtitle">
             <span v-if="tab === 'trialBalance'" :class="tb.balanced ? 'badge-ok' : 'badge-bad'">
-              {{ tb.balanced ? '✓ الميزان متوازن (مدين = دائن)' : '✗ الميزان غير متوازن!' }}
+              {{ tb.balanced ? '✔ الميزان متوازن (مدين = دائن)' : '✗ الميزان غير متوازن!' }}
             </span>
             <span v-else>تقارير فعّالة من قيود قاعدة البيانات — ميزان مراجعة · أستاذ عام · قائمة دخل · سجل عمليات</span>
           </p>
@@ -87,7 +87,7 @@
         </table>
         <div v-else class="empty-box-wrap">
           <div class="empty-box">
-            <span class="empty-icon">📭</span>
+            <span class="empty-icon">◈</span>
             <p class="empty-title">لا توجد حركات على هذا الحساب بعد</p>
           </div>
         </div>
@@ -146,7 +146,7 @@
             <tr v-if="auditRows.length === 0">
               <td colspan="5" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">🔍</span>
+                  <span class="empty-icon"></span>
                   <p class="empty-title">لا توجد عمليات مسجلة</p>
                 </div>
               </td>
@@ -167,9 +167,9 @@ import { fmt, trialBalance, generalLedger, incomeStatement } from '../../db/engi
 
 const tabs = [
   { key: 'trialBalance', label: 'ميزان المراجعة', icon: '⚖️' },
-  { key: 'ledger', label: 'الأستاذ العام', icon: '📒' },
+  { key: 'ledger', label: 'الأستاذ العام', icon: '◈' },
   { key: 'income', label: 'قائمة الدخل', icon: '📈' },
-  { key: 'audit', label: 'سجل العمليات', icon: '🔍' },
+  { key: 'audit', label: 'سجل العمليات', icon: '' },
 ]
 const tab = ref('trialBalance')
 const tb = ref({ rows: [], totalDebit: 0, totalCredit: 0, balanced: false })

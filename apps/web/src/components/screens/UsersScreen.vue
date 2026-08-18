@@ -42,7 +42,7 @@
                 <div class="action-cells">
                   <button class="act" @click="openForm(u)" :disabled="u.id === 1" title="تعديل">✎</button>
                   <button class="act danger" @click="toggleActive(u)" title="تفعيل/تعطيل">
-                    {{ u.active ? '⊘' : '✓' }}
+                    {{ u.active ? '⊘' : '✔' }}
                   </button>
                 </div>
               </td>

@@ -8,14 +8,14 @@
         </div>
         <div class="header-actions">
           <button class="btn btn-primary btn-lg" @click="openCloseDialog" :disabled="!canClose">
-            <span>إقفال فترة</span><span class="btn-icon">🔒</span>
+            <span>إقفال فترة</span><span class="btn-icon">◈</span>
           </button>
         </div>
       </div>
 
       <div class="info-card" v-if="tbSummary">
         <p>حالة التوازن حتى {{ lastDayLabel }}: الأصول {{ fmt(tbSummary.assets) }} = الخصوم + الحقوق {{ fmt(tbSummary.claims) }}
-          <b :class="tbSummary.balanced ? 'text-ok' : 'text-bad'">{{ tbSummary.balanced ? '— متوازن ✓' : '— غير متوازن!' }}</b>
+          <b :class="tbSummary.balanced ? 'text-ok' : 'text-bad'">{{ tbSummary.balanced ? '— متوازن ✔' : '— غير متوازن!' }}</b>
           (قبل الإقفال يجب أن يكون النظام متوازنًا)</p>
       </div>
 
@@ -35,7 +35,7 @@
               <td style="font-weight:600">{{ c.period }}</td>
               <td>{{ c.closedAtStr }}</td>
               <td>{{ c.closedBy }}</td>
-              <td><span class="status-pill posted">🔒 مقفل</span></td>
+              <td><span class="status-pill posted">◈ مقفل</span></td>
               <td>
                 <button class="btn btn-outline btn-sm" @click="reopenPeriod(c.period)" :disabled="!c.mayReopen">
                   فتح الفترة
@@ -45,7 +45,7 @@
             <tr v-if="closedPeriods.length === 0">
               <td colspan="5" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">🗓️</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا توجد فترات مقفلة بعد</p>
                   <p class="empty-hint">عند إقفال فترة لا يمكن تعديل أي سند أو فاتورة أو قيد في شهرها — استخدم «إقفال فترة» في الأعلى</p>
                 </div>
@@ -85,7 +85,7 @@
           <div class="cs-row"><span>فواتير مقفلة</span><span>{{ closeSummary.invoices }}</span></div>
           <div class="cs-row"><span>سندات مقفلة</span><span>{{ closeSummary.vouchers }}</span></div>
           <div class="cs-row cs-total" :class="closeSummary.balanced ? 'text-ok' : 'text-bad'">
-            <span>ميزان النظام</span><span>{{ closeSummary.balanced ? 'متوازن ✓ — جاهز للإقفال' : 'غير متوازن — راجع الميزان قبل الإقفال' }}</span>
+            <span>ميزان النظام</span><span>{{ closeSummary.balanced ? 'متوازن ✔ — جاهز للإقفال' : 'غير متوازن — راجع الميزان قبل الإقفال' }}</span>
           </div>
         </div>
         <div v-if="formError" class="form-msg form-msg-error">{{ formError }}</div>

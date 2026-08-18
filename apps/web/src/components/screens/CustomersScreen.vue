@@ -13,7 +13,7 @@
 
       <div class="filter-row">
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input type="text" class="search-input" placeholder="ابحث بالاسم أو الهاتف..." v-model="search" />
           <button class="search-go" @click="applySearch">انتقال</button>
         </div>
@@ -46,12 +46,12 @@
               <td class="num-cell"><b :class="c.balance > 0 ? 'balance-due' : 'credit-zero'">{{ fmt(c.balance) }}</b></td>
               <td class="num-cell">{{ (c.creditLimit || 0) > 0 ? fmt(c.creditLimit) : '∞' }}</td>
               <td><span class="status-dot" :class="c.status === 'active' ? 'ok' : 'off'"></span><span class="status-name" :class="c.status === 'active' ? 'ok' : 'off'">{{ c.status === 'active' ? 'نشط' : 'معطّل' }}</span></td>
-              <td><button class="act danger" @click="handleDelete(c)" :title="c.hasSales ? 'لديه مبيعات — سيتم تعطيله بدلًا من الحذف' : 'حذف'">{{ c.hasSales ? '🔒' : '✕' }}</button></td>
+              <td><button class="act danger" @click="handleDelete(c)" :title="c.hasSales ? 'لديه مبيعات — سيتم تعطيله بدلًا من الحذف' : 'حذف'">{{ c.hasSales ? 'مقفل' : '✕' }}</button></td>
             </tr>
             <tr v-if="filtered.length === 0">
               <td colspan="10" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">🧑‍💼</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا يوجد عملاء بعد</p>
                   <p class="empty-hint">اضغط زر «جديد» لإضافة أول عميل — الرصيد الآجل مشتق من البيانات الفعلية لا بيانات وهمية</p>
                 </div>

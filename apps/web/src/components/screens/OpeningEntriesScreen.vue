@@ -35,12 +35,12 @@
               <td style="font-weight:600">{{ e.description }}</td>
               <td class="num-cell">{{ fmt(entryDebit(e.id)) }}</td>
               <td class="num-cell">{{ fmt(entryCredit(e.id)) }}</td>
-              <td><span class="status-pill posted">✓ مرحَّل</span></td>
+              <td><span class="status-pill posted">✔ مرحَّل</span></td>
             </tr>
             <tr v-if="openingEntries.length === 0">
               <td colspan="6" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">📘</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا توجد قيود افتتاحية بعد</p>
                   <p class="empty-hint">اضغط «قيد افتتاحي جديد» لإدخال أرصدة أول المدة (الصندوق، العملاء، الموردين، المخزون، رأس المال)</p>
                 </div>
@@ -90,12 +90,12 @@
           <button class="btn btn-outline btn-sm" @click="addLine">+ سطر</button>
           <div class="line-totals">
             <span>مدين: <b>{{ fmt(lineDebit) }}</b> — دائن: <b>{{ fmt(lineCredit) }}</b></span>
-            <span class="bal-badge" :class="balancedForm ? 'ok' : 'bad'">{{ balancedForm ? '✓ متوازن' : '✗ غير متوازن' }}</span>
+            <span class="bal-badge" :class="balancedForm ? 'ok' : 'bad'">{{ balancedForm ? '✔ متوازن' : '✗ غير متوازن' }}</span>
           </div>
         </div>
         <div class="entry-hints">
-          <p>💡 مثال: مدين «ذمم العملاء» رصيد عميل / مدين «الصندوق» نقدي في الصندوق / مدين «المخزون» قيمة المخزون — دائن «رأس المال» الفرق.</p>
-          <p>💡 لسداد مورد: مدين «المصروفات/الذمم الدائنة» ودائن «الصندوق».</p>
+          <p>◈ مثال: مدين «ذمم العملاء» رصيد عميل / مدين «الصندوق» نقدي في الصندوق / مدين «المخزون» قيمة المخزون — دائن «رأس المال» الفرق.</p>
+          <p>◈ لسداد مورد: مدين «المصروفات/الذمم الدائنة» ودائن «الصندوق».</p>
         </div>
         <div v-if="formError" class="form-msg form-msg-error">{{ formError }}</div>
         <div class="form-actions-row">

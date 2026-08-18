@@ -13,7 +13,7 @@
 
       <div class="filter-row">
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input type="text" class="search-input" placeholder="ابحث بالاسم أو الهاتف..." v-model="search" />
           <button class="search-go" @click="applySearch">انتقال</button>
         </div>
@@ -44,7 +44,7 @@
               <td class="num-cell">{{ fmt(s.totalPaid) }}</td>
               <td class="num-cell"><b :class="s.balance > 0 ? 'balance-due' : 'credit-zero'">{{ fmt(s.balance) }}</b></td>
               <td><span class="status-dot" :class="s.status === 'active' ? 'ok' : 'off'"></span><span class="status-name" :class="s.status === 'active' ? 'ok' : 'off'">{{ s.status === 'active' ? 'نشط' : 'معطّل' }}</span></td>
-              <td><button class="act danger" @click="handleDelete(s)" :title="s.hasPurchases ? 'لديه مشتريات — سيتم تعطيله بدلًا من الحذف' : 'حذف'">{{ s.hasPurchases ? '🔒' : '✕' }}</button></td>
+              <td><button class="act danger" @click="handleDelete(s)" :title="s.hasPurchases ? 'لديه مشتريات — سيتم تعطيله بدلًا من الحذف' : 'حذف'">{{ s.hasPurchases ? '◈' : '✕' }}</button></td>
             </tr>
             <tr v-if="filtered.length === 0">
               <td colspan="9" class="empty-row">

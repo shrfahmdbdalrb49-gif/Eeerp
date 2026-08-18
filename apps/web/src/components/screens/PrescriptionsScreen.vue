@@ -3,7 +3,7 @@
   <div class="screen-container">
     <div class="screen-toolbar">
       <div class="toolbar-right">
-        <input type="text" class="input-field search-input" placeholder="🔍 ابحث برقم الوصفة، المريض، الطبيب..." v-model="search" />
+        <input type="text" class="input-field search-input" placeholder=" ابحث برقم الوصفة، المريض، الطبيب..." v-model="search" />
         <select class="input-field filter-select" v-model="statusFilter">
           <option value="all">كل الحالات</option>
           <option value="pending">بانتظار الصرف</option>
@@ -46,7 +46,7 @@
             </td>
             <td>
               <button class="action-btn view" @click.stop="openForm(rx)">📋 عرض/تعديل</button>
-              <button v-if="rx.status === 'pending'" class="action-btn dispense" @click.stop="dispense(rx)">💊 صرف</button>
+              <button v-if="rx.status === 'pending'" class="action-btn dispense" @click.stop="dispense(rx)">◈ صرف</button>
             </td>
           </tr>
           <tr v-if="filteredRx.length === 0">
@@ -153,8 +153,8 @@
           <span class="rx-total">عدد الأدوية: <strong>{{ form.items.filter(i => i.itemId).length }}</strong></span>
           <div class="footer-actions">
             <button class="btn btn-secondary" @click="showForm = false">إلغاء</button>
-            <button class="btn btn-primary" @click="saveRx">💾 حفظ الوصفة</button>
-            <button v-if="editingRx && editingRx.status === 'pending'" class="btn btn-success" @click="saveAndDispense">💊 حفظ وصرف</button>
+            <button class="btn btn-primary" @click="saveRx">حفظ الوصفة</button>
+            <button v-if="editingRx && editingRx.status === 'pending'" class="btn btn-success" @click="saveAndDispense">◈ حفظ وصرف</button>
           </div>
         </div>
       </div>

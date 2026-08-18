@@ -5,7 +5,7 @@
         <div class="page-title">
           <h1>اليومية العامة</h1>
           <p class="page-subtitle">{{ entries.length }} قيدًا — رصيد النظام:
-            <span class="balance-ok" v-if="balanced">متوازن ✓</span>
+            <span class="balance-ok" v-if="balanced">متوازن ✔</span>
             <span class="balance-bad" v-else>غير متوازن!</span>
           </p>
         </div>
@@ -35,12 +35,12 @@
               <td><span class="ref-badge">{{ refLabel(e.refKind) }}</span></td>
               <td class="num-cell">{{ fmt(entryDebit(e.id)) }}</td>
               <td class="num-cell">{{ fmt(entryCredit(e.id)) }}</td>
-              <td><span class="status-pill posted">✓ مرحَّل</span></td>
+              <td><span class="status-pill posted">✔ مرحَّل</span></td>
             </tr>
             <tr v-if="entries.length === 0">
               <td colspan="7" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">📜</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">لا توجد قيود محاسبية بعد</p>
                   <p class="empty-hint">أول قيد يُنشأ تلقائيًا عند أول عملية (شراء/بيع/تحصيل)</p>
                 </div>
@@ -91,7 +91,7 @@
           <button class="btn btn-outline btn-sm" @click="addLine">+ سطر</button>
           <div class="line-totals">
             <span>مدين: <b>{{ fmt(lineDebit) }}</b> — دائن: <b>{{ fmt(lineCredit) }}</b></span>
-            <span class="bal-badge" :class="balancedForm ? 'ok' : 'bad'">{{ balancedForm ? '✓ متوازن' : '✗ غير متوازن' }}</span>
+            <span class="bal-badge" :class="balancedForm ? 'ok' : 'bad'">{{ balancedForm ? '✔ متوازن' : '✗ غير متوازن' }}</span>
           </div>
         </div>
 

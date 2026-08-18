@@ -33,14 +33,14 @@
               <td>
                 <div class="action-cells">
                   <button class="act" @click="openForm(acc)" title="تعديل">✎</button>
-                  <button class="act danger" @click="deleteAccount(acc)" title="حذف" :disabled="accHasMovements(acc.id)">🗑</button>
+                  <button class="act danger" @click="deleteAccount(acc)" title="حذف" :disabled="accHasMovements(acc.id)">✕</button>
                 </div>
               </td>
             </tr>
             <tr v-if="accounts.length === 0">
               <td colspan="6" class="empty-row">
                 <div class="empty-box">
-                  <span class="empty-icon">📒</span>
+                  <span class="empty-icon">◈</span>
                   <p class="empty-title">دليل الحسابات فارغ</p>
                   <p class="empty-hint">اضغط «جديد» لإنشاء أول حساب في الدليل</p>
                 </div>

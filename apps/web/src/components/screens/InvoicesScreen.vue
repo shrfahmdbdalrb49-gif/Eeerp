@@ -1,7 +1,7 @@
 <template>
   <div class="invoices-screen">
     <div class="screen-toolbar">
-      <input type="text" class="input-field" v-model="query" placeholder="🔍 بحث برقم الفاتورة أو اسم العميل..." style="max-width:260px" />
+      <input type="text" class="input-field" v-model="query" placeholder=" بحث برقم الفاتورة أو اسم العميل..." style="max-width:260px" />
       <span class="toolbar-spacer"></span>
       <span class="toolbar-info">سجل فواتير المبيعات الفعلية من قاعدة البيانات</span>
     </div>
@@ -16,7 +16,7 @@
             <td style="font-weight:bold">{{ inv.customerName || 'نقدي (بدون عميل)' }}</td>
             <td class="num"><b>{{ fmt(inv.total) }}</b></td>
             <td><span :class="'pay-chip ' + inv.paymentType">{{ payLabel(inv.paymentType) }}</span></td>
-            <td>{{ inv.status === 'posted' ? 'مرحَّل ✓' : inv.status }}</td>
+            <td>{{ inv.status === 'posted' ? 'مرحَّل ✔' : inv.status }}</td>
           </tr>
           <tr v-if="filtered.length === 0">
             <td colspan="6" class="empty-state">{{ invoices.length === 0 ? 'لا توجد فواتير بيع بعد — أنشئ فاتورة من نقطة البيع' : 'لا توجد نتائج مطابقة للبحث' }}</td>
