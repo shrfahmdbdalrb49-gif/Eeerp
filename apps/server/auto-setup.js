@@ -76,6 +76,16 @@ export async function autoSetup(pool) {
         console.log(`🔧 retro-je: ${res.rowCount ?? 0} صفوف صُححت: ${stmt.trim().slice(0, 60)}`)
       }
     } catch (e) { console.error('⚠️ retro-je-fix skipped:', e.message) }
+
+    /* إصلاح الأسطر التي أفسدها retro-je-fix: debit وcredit ممتلئان معًا في نفس السطر (غير idempotent إلا بالوصف) */
+    try {
+      const fix = await readFile(join(__dirname, 'sql', 'fix-je-lines.sql'), 'utf8')
+      const fixStatements = splitSQL(fix)
+      for (const stmt of fixStatements) {
+        const res = await pool.query(stmt)
+        console.log(`🔧 fix-je: ${res.rowCount ?? 0} أسطر صُححت: ${stmt.trim().slice(0, 80)}`)
+      }
+    } catch (e) { console.error('⚠️ fix-je-lines skipped:', e.message) }
     return true
   } catch (err) {
     console.error('⚠️ فشل التهيئة التلقائية كليًا:', err.message)
