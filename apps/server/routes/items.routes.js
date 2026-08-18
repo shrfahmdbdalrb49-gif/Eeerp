@@ -92,8 +92,11 @@ router.delete('/:id', requireAuth, requirePermission('items.write'), async (req,
 })
 
 router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (req, res, next) => {
+  const conn = await getPool().connect()
   try {
-    const rows = await query(
+    const item = await conn.query(`SELECT id, name FROM items WHERE id = $1`, [Number(req.params.id)])
+    if (!item.rows[0]) return res.status(404).json({ error: 'الصنف غير موجود' })
+    const rows = await conn.query(
       `SELECT b.id AS batch_id, b.batch_no, b.expiry_date, b.cost_per_unit AS cost,
               COALESCE(SUM(sm.quantity),0) AS quantity,
               COALESCE(SUM(sm.reserved_quantity),0) AS reserved,
@@ -104,13 +107,9 @@ router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (re
        GROUP BY b.id ORDER BY b.expiry_date`,
       [Number(req.params.id)],
     )
-    /* DEBUG v79b: إجمالي SUM(quantity) عبر جميع الحركات (بدون تجميع دُفعات) للتحقق */
-    const tot = await query(
-      `SELECT COALESCE(SUM(quantity),0) AS sum_qty FROM stock_movements WHERE item_id = $1`,
-      [Number(req.params.id)],
-    )
-    res.json({ build: 'v79b', total_qty: tot.rows[0].sum_qty, batches: rows })
+    res.json({ build: 'v79c', batches: rows.rows })
   } catch (err) { next(err) }
+  finally { conn.release() }
 })
 
 export default router
