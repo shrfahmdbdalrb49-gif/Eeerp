@@ -204,6 +204,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
     })
 
     /* خصم المخزون (FIFO/LOT) */
+    let lastTargetId = null
     for (const l of lines.rows) {
       let remaining = Number(l.quantity || 0)
       let batchSel = l.batch_id
@@ -230,18 +231,20 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
         if (!available.rows.length) break
         const take = Math.min(remaining, Number(available.rows[0].avail))
         remaining -= take
+        const outBatchId = target.rows[0].batch_id ? Number(target.rows[0].batch_id) : null
+        lastTargetId = target.rows[0].id
         await conn.query(
           `INSERT INTO stock_movements (item_id, batch_id, store_id, movement_type, quantity, unit_cost,
              ref_kind, ref_id, created_by)
            VALUES ($1,$2,$3,'out',-($4::numeric),$5,'sale',$6,$7)`,
-          [l.item_id, Number(target.rows[0].batch_id) || null, s.store_id, take, Number(l.cost_at_sale || 0), id, req.user.id],
+          [l.item_id, outBatchId, s.store_id, take, Number(l.cost_at_sale || 0), id, req.user.id],
         )
       }
     }
     await conn.query("UPDATE sales_invoices SET status = 'final' WHERE id = $1", [id])
     await conn.query('COMMIT')
     await auditLog(req, 'sale.post', 'sale', id)
-    res.json({ ok: true, entry_no: entryNo, batch_marker: 'v80b' })
+    res.json({ ok: true, entry_no: entryNo, batch_marker: 'v80c', last_target_id: lastTargetId })
   } catch (err) {
     await conn.query('ROLLBACK').catch(() => {})
     next(err)
