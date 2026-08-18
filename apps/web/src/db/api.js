@@ -94,7 +94,16 @@ export async function apiFetch(path, options = {}) {
       options = { ...options, body: JSON.stringify(camelToSnake(parsed)) }
     } catch { /* ليس JSON — يُرسل كما هو */ }
   }
-  const res = await fetch(apiBase() + path, { ...options, headers })
+  /* Timeout موحّد (افتراضي 60 ثانية) يحول التعليق الأبدي إلى خطأ واضح قابل لإعادة المحاولة */
+  const timeoutMs = typeof options.timeout === 'number' ? options.timeout : 60000
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  let res
+  try {
+    res = await fetch(apiBase() + path, { ...options, headers, signal: ctrl.signal })
+  } finally {
+    clearTimeout(timer)
+  }
   const text = await res.text()
   let data = null
   let rawText = false
@@ -114,6 +123,7 @@ export async function apiFetch(path, options = {}) {
 export async function serverLogin(username, password) {
   const data = await apiFetch('/auth/login', {
     method: 'POST',
+    timeout: 45000,
     body: JSON.stringify({ username: (username || '').trim().toLowerCase(), password }),
   })
   saveAuth({ user: data.user, token: data.token })
