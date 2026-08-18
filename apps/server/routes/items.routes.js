@@ -106,12 +106,16 @@ router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (re
     )
     /* الكمية الكلية عبر كل الحركات (بما فيها التي بلا دفعة مثل المرجعات) */
     const tot = await query(
-      `SELECT COALESCE(SUM(CASE WHEN movement_type='in' THEN quantity ELSE -quantity END),0) AS net_qty
+      `SELECT COALESCE(SUM(CASE WHEN movement_type='in' THEN quantity ELSE quantity END),0) AS net_qty
        FROM stock_movements WHERE item_id = $1`,
       [Number(req.params.id)],
     )
-    res.json({ batches: rows, total: Number(tot.rows[0].net_qty) })
-  } catch (err) { next(err) }
+    const netTotal = Number(tot[0]?.net_qty || 0)
+    res.json({ batches: rows, total: netTotal })
+  } catch (err) {
+    console.error('[STOCK-ERR]', err?.message, err?.stack?.split('\n').slice(0, 4).join(' | '))
+    next(err)
+  }
 })
 
 /* DEBUG v79d: يعرض جميع حركات المخزون للصنف لتشخيص batch mismatch */
