@@ -80,3 +80,38 @@ router.post('/retry', async (req, res) => {
   }
 })
 export default router
+
+/* ---------- تطبيق migrations.sql فقط (آمن على الإنتاج: لا يعيد schema ولا seed)
+   POST /api/setup/apply-migrations?key=<secret>
+   ------------------------------ */
+router.post('/apply-migrations', async (req, res) => {
+  let pool = null
+  try {
+    const key = (req.body && req.body.key) || (req.query && req.query.key)
+    if (key !== SECRET) return res.status(401).json({ error: 'مفتاح غير صالح' })
+    const db = await import('../config/db.js')
+    pool = db.getPool()
+    const { readFile } = await import('fs/promises')
+    const { fileURLToPath } = await import('url')
+    const { dirname, join } = await import('path')
+    const { splitSQL } = await import('../sql/split.js')
+    const dir = dirname(fileURLToPath(import.meta.url))
+    const mig = await readFile(join(dir, '..', 'sql', 'migrations.sql'), 'utf8')
+    const stmts = splitSQL(mig)
+    let ok = 0
+    let skipped = 0
+    const errors = []
+    for (const stmt of stmts) {
+      try {
+        await pool.query(stmt)
+        ok++
+      } catch (e) {
+        if (String(e.message).match(/already exists|لا exists|غير موجود/i)) skipped++
+        else errors.push(`stmt[${ok + skipped}]: ${e.message}`)
+      }
+    }
+    res.json({ ok: true, applied: ok, skipped: skipped, errors })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err && err.message ? err.message : err) })
+  }
+})
