@@ -30,8 +30,8 @@ router.get('/trial-balance', requireAuth, requirePermission('reports.read'), asy
       const mapped = rows.map(r => {
         const debit = Number(r.debit || 0)
         const credit = Number(r.credit || 0)
+        totalDebit += debit; totalCredit += credit
         const bal = r.balance_direction === 'credit' ? credit - debit : debit - credit
-        if (bal >= 0) totalDebit += bal; else totalCredit += -bal
         return { ...r, balance: Number(bal.toFixed(2)) }
       })
       res.json({ to_date: to, accounts: mapped, total_debit: Number(totalDebit.toFixed(2)), total_credit: Number(totalCredit.toFixed(2)) })
