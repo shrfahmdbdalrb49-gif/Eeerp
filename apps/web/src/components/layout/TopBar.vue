@@ -17,6 +17,7 @@
             class="menu-item"
             role="menuitem"
             tabindex="0"
+            :data-menu-key="section.menuKey"
             :class="{ open: openMenu === section.menuKey }"
             @click="toggleMenu(section.menuKey)"
             @touchend.prevent.stop="toggleMenu(section.menuKey)"
@@ -28,38 +29,6 @@
             </svg>
           </button>
 
-          <transition name="dropdown">
-            <div
-              v-if="openMenu === section.menuKey"
-              class="dropdown-panel"
-              role="menu"
-              @click.stop
-              @mouseleave="keepOpen = false"
-            >
-              <div class="dropdown-scroll">
-                <template v-for="group in section.groups" :key="group.title">
-                  <div v-if="group.title" :class="['dropdown-group-title', { 'is-report-group': /^تقارير/.test(group.title) }]">{{ group.title }}</div>
-                  <template v-for="child in group.children" :key="child.title ?? child.page">
-                    <div v-if="child.children" class="dropdown-group-title dropdown-group-title--nested">{{ child.title }}</div>
-                    <template v-for="leaf in (child.children || [child])" :key="leaf.page">
-                      <button
-                        type="button"
-                        class="dropdown-item"
-                        :class="{ active: activePage === leaf.page, pending: !isImplemented(leaf.page), nested: !!child.children }"
-                        @click.stop="pick(section.menuKey, leaf.page)"
-                      >
-                        <span class="dropdown-item-label">{{ leaf.label }}</span>
-                        <span class="dropdown-item-trail">
-                          <svg v-if="child.children" class="dropdown-item-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
-                          <span v-if="!isImplemented(leaf.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
-                        </span>
-                      </button>
-                    </template>
-                  </template>
-                </template>
-              </div>
-            </div>
-          </transition>
         </div>
       </template>
     </nav>
@@ -95,6 +64,47 @@
       </div>
     </div>
   </header>
+
+  <!-- ===== القائمة المنسدلة — تُعرض فوق كل شيء خارج الشريط (Teleport) =====
+       الحل يضمن ظهور القائمة فوق أي نافذة مفتوحة بغض النظر عن طبقات stacking -->
+  <teleport to="body">
+  <transition name="dropdown">
+    <template v-for="section in allSections" :key="'tp-' + section.menuKey">
+      <div
+        v-if="openMenu === section.menuKey"
+        class="dropdown-panel dropdown-panel--teleported"
+        :style="panelStyle"
+        role="menu"
+        @mouseenter="keepOpen = true"
+        @mouseleave="keepOpen = false"
+        @click.stop
+      >
+        <div class="dropdown-scroll">
+          <template v-for="group in section.groups" :key="'g-' + group.title">
+            <div v-if="group.title" :class="['dropdown-group-title', { 'is-report-group': /^تقارير/.test(group.title) }]">{{ group.title }}</div>
+            <template v-for="child in group.children" :key="'c-' + (child.title ?? child.page)">
+              <div v-if="child.children" class="dropdown-group-title dropdown-group-title--nested">{{ child.title }}</div>
+              <template v-for="leaf in (child.children || [child])" :key="'l-' + leaf.page">
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  :class="{ active: activePage === leaf.page, pending: !isImplemented(leaf.page), nested: !!child.children }"
+                  @click.stop="pick(section.menuKey, leaf.page)"
+                >
+                  <span class="dropdown-item-label">{{ leaf.label }}</span>
+                  <span class="dropdown-item-trail">
+                    <svg v-if="child.children" class="dropdown-item-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                    <span v-if="!isImplemented(leaf.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
+                  </span>
+                </button>
+              </template>
+            </template>
+          </template>
+        </div>
+      </div>
+    </template>
+  </transition>
+  </teleport>
 </template>
 
 <script setup>
@@ -109,7 +119,7 @@
  * Events:
  *   - select(page) → فتح شاشة
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 
 const props = defineProps({
   activePage: { type: [String, null], default: null },
@@ -473,6 +483,29 @@ const allSections = [
 const openMenu = ref(null)
 const keepOpen = ref(false)
 
+/**
+ * تموضع القائمة المنسدلة: تُعرض fixed أعلى كل العناصر (خارج شجرة الشريط)
+ * حتى لا تُغطى بأي نافذة مفتوحة مهما كانت طبقاتها.
+ */
+const panelStyle = ref({})
+
+function positionMenu(sectionKey) {
+  const button = document.querySelector(
+    `.menu-wrapper .menu-item.open, .menu-item[data-menu-key="${sectionKey}"].open`
+  )
+  if (!button) return
+  const r = button.getBoundingClientRect()
+  // في RTL: القسم يمتد من r.left حتى r.right؛ القائمة بعرض ثابت وتبدأ عند الحافة اليمنى للقسم
+  panelStyle.value = {
+    position: 'fixed',
+    top: '46px',
+    left: r.left + 'px',
+    width: '218px',
+    zIndex: 9999,
+    boxShadow: '0 10px 28px rgba(8, 14, 28, 0.35)',
+  }
+}
+
 function toggleMenu(key) {
   // النقر على قسم مغلق يفتحه فورًا — النقر على قسم مفتوح يغلقه
   if (openMenu.value === key) {
@@ -480,6 +513,7 @@ function toggleMenu(key) {
   } else {
     openMenu.value = key
     keepOpen.value = false
+    nextTick(() => positionMenu(key))
   }
 }
 
@@ -493,6 +527,7 @@ function onHover(key) {
   lastHoverKey = key
   openMenu.value = key
   keepOpen.value = false
+  nextTick(() => positionMenu(key))
 }
 
 function pick(sectionKey, page) {
