@@ -70,10 +70,11 @@
                       v-else
                       type="button"
                       class="dropdown-item"
-                      :class="{ active: activePage === child.page }"
+                      :class="{ active: activePage === child.page, pending: !isImplemented(child.page) }"
                       @click.stop="pick(section.menuKey, child.page)"
                     >
-                      {{ child.label }}
+                      <span class="dropdown-item-label">{{ child.label }}</span>
+                      <span v-if="!isImplemented(child.page)" class="dropdown-item-badge" title="هذه الشاشة قيد التطوير وغير منفذة فعليًا">قيد التطوير</span>
                     </button>
                   </template>
                 </template>
@@ -83,6 +84,15 @@
         </div>
       </template>
     </nav>
+
+    <!-- رسالة تنبيه للشاشات قيد التطوير -->
+    <transition name="toast-msg">
+      <div v-if="notImplMsg" class="notimpl-toast" role="alert">
+        <svg class="notimpl-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span>{{ notImplMsg }}</span>
+        <button type="button" class="notimpl-close" @click="notImplMsg = null" aria-label="إغلاق">×</button>
+      </div>
+    </transition>
 
     <!-- البحث السريع + المستخدم -->
     <div class="top-tools">
@@ -131,6 +141,23 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 
 // ===== قائمة الأقسام الـ14 =====
+// قائمة مفاتيح الصفحات المنفذة فعليًا (لها شاشة تعمل وتحفظ بيانات حقيقية)
+// كل ما هو خارجها يُعرض في القوائم بعلامة «قيد التطوير» ورسالة واضحة بدل شاشة فارغة.
+const implementedPages = new Set([
+  'dashboard',
+  'customers', 'suppliers', 'doctors', 'items',
+  'pos', 'invoices', 'sales-invoices', 'prescriptions', 'returns',
+  'collections', 'aging-customers',
+  'purchase-invoices', 'receiving', 'transfers',
+  'supplier-payments', 'payable', 'aging-suppliers',
+  'expiry',
+  'treasury', 'cash-boxes', 'banks', 'cheques', 'receipt-voucher', 'payment-voucher', 'financial-transfers',
+  'accounts', 'journal', 'opening-entries', 'posting', 'period-close',
+  'users', 'branches', 'settings', 'audit',
+  'reports-sales', 'reports-inventory', 'reports-financial',
+  'trial-balance', 'income-statement', 'balance-sheet', 'general-ledger',
+])
+
 const allSections = [
   {
     key: 'sec-dashboard',
@@ -485,8 +512,26 @@ function toggleSub(sectionKey, title) {
 
 function pick(sectionKey, page) {
   keepOpen.value = true
+  if (!implementedPages.has(page)) {
+    // قسم غير منفذ: لا نفتح شاشة فارغة ولا نُوحِي بأنه يعمل — رسالة واضحة فقط
+    const child = (allSections.find(s => s.menuKey === sectionKey)?.groups || [])
+      .flatMap(g => g.children || [])
+      .find(c => c.page === page)
+    showNotImplemented(child ? child.label : page)
+    openMenu.value = null
+    return
+  }
   openMenu.value = null
   emit('select', page)
+}
+
+// ===== رسالة توضيحية للشاشات غير المنفذة =====
+const notImplMsg = ref(null)
+let notImplTimer = null
+function showNotImplemented(label) {
+  notImplMsg.value = `شاشة «${label}» قيد التطوير — غير منفذة فعليًا بعد ولا تحفظ أي بيانات.`
+  if (notImplTimer) clearTimeout(notImplTimer)
+  notImplTimer = setTimeout(() => { notImplMsg.value = null }, 6000)
 }
 
 let pointerStartedInTopBar = false
@@ -576,6 +621,10 @@ function globalShortcut(e) {
 }
 
 const avatarChar = computed(() => (props.userName || 'أ')[0])
+
+function isImplemented(page) {
+  return implementedPages.has(page)
+}
 </script>
 
 <style scoped>
@@ -727,6 +776,69 @@ const avatarChar = computed(() => (props.userName || 'أ')[0])
   background: #e8dfc2;
   color: #4a3f0e;
   font-weight: 700;
+}
+.dropdown-item.pending {
+  color: #8a7a52;
+}
+.dropdown-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dropdown-item-badge {
+  margin-inline-start: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f3ead6;
+  border: 1px solid #d9c994;
+  color: #8a6f22;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ===== رسالة الشاشات قيد التطوير ===== */
+.notimpl-toast {
+  position: absolute;
+  top: 46px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fff8e1;
+  border: 1px solid #d9c994;
+  border-radius: 8px;
+  color: #6b5a15;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(8, 14, 28, 0.4);
+  z-index: 130;
+  max-width: 70vw;
+}
+.notimpl-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.notimpl-close {
+  background: transparent;
+  border: none;
+  color: #8a6f22;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.toast-msg-enter-active,
+.toast-msg-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast-msg-enter-from,
+.toast-msg-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
 }
 
 .dropdown-subtitle {
