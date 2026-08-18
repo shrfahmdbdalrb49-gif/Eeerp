@@ -104,7 +104,12 @@ router.get('/:id/stock', requireAuth, requirePermission('items.read'), async (re
        GROUP BY b.id ORDER BY b.expiry_date`,
       [Number(req.params.id)],
     )
-    res.json(rows)
+    /* DEBUG v79b: إجمالي SUM(quantity) عبر جميع الحركات (بدون تجميع دُفعات) للتحقق */
+    const tot = await query(
+      `SELECT COALESCE(SUM(quantity),0) AS sum_qty FROM stock_movements WHERE item_id = $1`,
+      [Number(req.params.id)],
+    )
+    res.json({ build: 'v79b', total_qty: tot.rows[0].sum_qty, batches: rows })
   } catch (err) { next(err) }
 })
 
