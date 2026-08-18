@@ -285,14 +285,18 @@ router.post('/returns', requireAuth, requirePermission('sales.create'), async (r
          f.reason || null, Number(f.total_amount || 0), f.notes || null, req.user.id],
       )
       const rid = rows[0].id
+      let calc = 0
       for (const l of f.lines || []) {
         await conn.query(
           `INSERT INTO sales_return_lines (return_id, item_id, quantity, unit_price, line_total)
            VALUES ($1,$2,$3,$4,$5)`,
           [rid, Number(l.item_id), Number(l.quantity || 0), Number(l.unit_price || 0), Number(l.line_total || 0)],
         )
+        calc += Math.round((Number(l.quantity || 0) * Number(l.unit_price || 0) - Number(l.discount_amount || 0)) * 100) / 100
       }
-      res.status(201).json(rows[0])
+      if (calc > 0) await conn.query('UPDATE sales_returns SET total_amount = $1 WHERE id = $2', [calc, rid])
+      const full = await conn.query('SELECT * FROM sales_returns WHERE id = $1', [rid])
+      res.status(201).json(full.rows[0])
     } finally { conn.release() }
   } catch (err) { next(err) }
 })
@@ -306,6 +310,12 @@ router.post('/returns/:id/post', requireAuth, requirePermission('sales.create'),
     const r = head.rows[0]
     if (!r) throw Object.assign(new Error('المرتجع غير موجود'), { status: 404 })
     const lines = await conn.query('SELECT * FROM sales_return_lines WHERE return_id = $1', [id])
+    if (!lines.rows.length) throw Object.assign(new Error('لا يمكن ترحيل مرتجع بلا أصناف'), { status: 400 })
+    /* إصلاح محاسبي: حساب الإجمالي من الأسطر (الواجهة قد لا ترسله) */
+    const calcTotal = lines.rows.reduce((acc, l) => acc + Math.round((Number(l.quantity || 0) * Number(l.unit_price || 0) - Number(l.discount_amount || 0)) * 100) / 100, 0)
+    if (calcTotal <= 0) throw Object.assign(new Error('لا يمكن ترحيل مرتجع بإجمالي صفري — تحقق من الكميات والأسعار'), { status: 400 })
+    await conn.query(`UPDATE sales_returns SET total_amount = $1 WHERE id = $2`, [calcTotal, id])
+    r.total_amount = String(calcTotal)
     const entryNo = await nextEntryNo(conn)
     const ids = await acctIds(conn)
     const revAcct = ids.sales_ret || ids.revenue
