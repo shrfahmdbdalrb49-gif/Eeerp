@@ -218,7 +218,7 @@ router.post('/:id/post', requireAuth, requirePermission('sales.create'), async (
       while (remaining > 0) {
         /* لا نعدّل quantity في حركات in نهائيًا — ندخل حركة out سالبة لكل كمية مباعة (خصم واحد فقط) */
         const target = await conn.query(
-          `SELECT id FROM stock_movements
+          `SELECT id, batch_id FROM stock_movements
            WHERE item_id = $1 AND (store_id IS NOT DISTINCT FROM $2)
              AND movement_type = 'in' AND quantity - reserved_quantity > 0
              ${batchSel ? 'AND batch_id = ' + Number(batchSel) : ''}
