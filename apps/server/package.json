@@ -1,6 +1,6 @@
 {
   "name": "sharaf-erp-server",
-  "version": "1.0.0",
+  "version": "0.0.98",
   "description": "شرف ERP - الخادم المركزي (API + PostgreSQL + JWT + RBAC)",
   "type": "module",
   "main": "server.js",
