@@ -69,7 +69,8 @@
        الحل يضمن ظهور القائمة فوق أي نافذة مفتوحة بغض النظر عن طبقات stacking -->
   <teleport to="body">
   <transition name="dropdown">
-    <template v-for="section in allSections" :key="'tp-' + section.menuKey">
+    <div v-if="openMenu" class="dropdown-transition-shell">
+      <div v-for="section in allSections" :key="'tp-' + section.menuKey">
       <div
         v-if="openMenu === section.menuKey"
         class="dropdown-panel dropdown-panel--teleported"
@@ -102,7 +103,8 @@
           </template>
         </div>
       </div>
-    </template>
+      </div>
+    </div>
   </transition>
   </teleport>
 </template>
