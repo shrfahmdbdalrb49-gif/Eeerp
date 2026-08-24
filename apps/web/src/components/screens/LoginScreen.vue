@@ -2,7 +2,7 @@
   <div class="login-screen">
     <div class="login-card">
       <div class="login-brand">
-        <div class="brand-logo-frame"><img src="/assets/rifan-pharmacy-logo.png" alt="شعار صيدلية ريفان" /></div>
+        <div class="brand-icon">⚕</div>
         <h1>شرف ERP</h1>
         <p>نظام إدارة الصيدليات</p>
       </div>
@@ -80,22 +80,6 @@ async function doLogin() {
   color: #fff;
   text-align: center;
   padding: 26px 16px 22px;
-}
-.brand-logo-frame {
-  width: min(100%, 300px);
-  height: 124px;
-  margin: 0 auto 10px;
-  overflow: hidden;
-  background: #fff;
-  border: 2px solid #000;
-  box-shadow: 4px 4px 0 #000;
-}
-.brand-logo-frame img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center center;
 }
 .brand-icon { font-size: 44px; margin-bottom: 6px; }
 .login-brand h1 { margin: 0; font-size: 26px; }
